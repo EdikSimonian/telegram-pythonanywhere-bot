@@ -130,7 +130,11 @@ def _pa_wsgi_path() -> str:
     user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
     if not user:
         return ""
-    candidate = f"/var/www/{user}_pythonanywhere_com_wsgi.py"
+    # PA lowercases the username in the served WSGI filename even when the
+    # account has capitals (e.g. "AvetTumo"). $USER may preserve the account's
+    # case, so lowercase it here or we'd touch a file PA never reads and the
+    # post-deploy reload would silently no-op.
+    candidate = f"/var/www/{user.lower()}_pythonanywhere_com_wsgi.py"
     return candidate if os.path.exists(candidate) else ""
 
 

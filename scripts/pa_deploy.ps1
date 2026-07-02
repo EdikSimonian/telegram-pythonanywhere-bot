@@ -102,11 +102,19 @@ $CloneUrl = $RepoUrl.Trim()
 if ($CloneUrl -like 'git@github.com:*')        { $CloneUrl = 'https://github.com/' + $CloneUrl.Substring('git@github.com:'.Length) }
 elseif ($CloneUrl -like 'ssh://git@github.com/*') { $CloneUrl = 'https://github.com/' + $CloneUrl.Substring('ssh://git@github.com/'.Length) }
 
+# PA lowercases the username in the served WSGI filename and vhost, even when
+# the account name has capitals (e.g. "AvetTumo"). The /var/www path is on a
+# case-sensitive Linux FS, so uploading to the mixed-case name creates a second
+# file PA never reads — PA keeps serving its default hello-world wsgi, which
+# returns 200 on "/" and 404 everywhere else (the webhook then gets 404 and the
+# bot goes silent). Home dir preserves the account's case, so only the WSGI
+# filename needs lowercasing.
+$PaUsernameLower     = $PaUsername.ToLower()
 $PaApi               = "https://www.pythonanywhere.com/api/v0/user/$PaUsername"
 $Domain              = "$PaUsername.pythonanywhere.com"
 $ProjectDir          = "/home/$PaUsername/$RepoName"
 $VenvDir             = "/home/$PaUsername/.virtualenvs/telegram-bot"
-$WsgiFile            = "/var/www/${PaUsername}_pythonanywhere_com_wsgi.py"
+$WsgiFile            = "/var/www/${PaUsernameLower}_pythonanywhere_com_wsgi.py"
 $WebhookUrlResolved  = "https://$Domain/api/webhook"
 $PythonVersion       = 'python313'
 
@@ -120,6 +128,12 @@ Write-Host ""
 # ---- HTTP helper (PA API) ---------------------------------------------------
 # Returns @{ Code; Body }. -SkipHttpErrorCheck keeps 4xx/5xx from throwing so we
 # can branch on the status code (PA returns 403 for a missing web app, etc.).
+# The status is read off the response object's .StatusCode rather than via
+# -StatusCodeVariable: that parameter only exists on PowerShell 7.5+, but this
+# script declares #requires 7.0, and on 7.0–7.4 (or a process where an older
+# Utility assembly shadows the newer one) -StatusCodeVariable throws a
+# parameter-binding error that the catch below would mask as Code = 0 — which
+# surfaced as a bogus "PA API rejected the token" even for a valid token.
 function Invoke-Pa {
     param(
         [string]$Method = 'Get',
@@ -134,13 +148,29 @@ function Invoke-Pa {
     if (-not $NoAuth) { $headers['Authorization'] = "Token $PaToken" }
     $p = @{
         Uri = $uri; Method = $Method; Headers = $headers; TimeoutSec = $TimeoutSec
-        SkipHttpErrorCheck = $true; StatusCodeVariable = 'code'
+        SkipHttpErrorCheck = $true
     }
-    if ($Form)              { $p.Form = $Body }
-    elseif ($null -ne $Body) { $p.Body = $Body }
+    if ($Form) {
+        $p.Form = $Body
+    } elseif ($null -ne $Body) {
+        # URL-encode dictionary bodies ourselves and set the content type
+        # explicitly. Letting Invoke-WebRequest infer it from a hashtable
+        # body works for POST but leaves PATCH with an empty Content-Type on
+        # some PS7 builds, which PA rejects with HTTP 415 ("Unsupported media
+        # type"). An explicit form encoding is deterministic across methods.
+        if ($Body -is [System.Collections.IDictionary]) {
+            $pairs = foreach ($k in $Body.Keys) {
+                '{0}={1}' -f [uri]::EscapeDataString([string]$k), [uri]::EscapeDataString([string]$Body[$k])
+            }
+            $p.Body = ($pairs -join '&')
+            $p.ContentType = 'application/x-www-form-urlencoded'
+        } else {
+            $p.Body = $Body
+        }
+    }
     try {
         $resp = Invoke-WebRequest @p
-        return [pscustomobject]@{ Code = [int]$code; Body = [string]$resp.Content }
+        return [pscustomobject]@{ Code = [int]$resp.StatusCode; Body = [string]$resp.Content }
     } catch {
         # Network-level failure (DNS, TLS, timeout) — no HTTP status.
         return [pscustomobject]@{ Code = 0; Body = [string]$_.Exception.Message }

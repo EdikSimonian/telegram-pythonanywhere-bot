@@ -6,4 +6,7 @@ __pycache__/
 .env*.local
 .deploy.lock
 .webhook_secret
+bot.db
+bot.db-shm
+bot.db-wal
 .vercel/
