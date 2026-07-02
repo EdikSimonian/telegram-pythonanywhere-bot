@@ -115,6 +115,116 @@ def test_handle_message_mention_only_skipped():
         mock_ask.assert_not_called()
 
 
+# ── /debug, /review, /quiz ──────────────────────────────────────────────────────
+
+
+def test_cmd_debug_calls_ask_ai_with_code():
+    with (
+        patch("bot.handlers.ask_ai", return_value="Fixed") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_debug
+
+        cmd_debug(make_message(text="/debug print(x"))
+        prompt = mock_ask.call_args[0][1]
+        assert "print(x" in prompt
+        mock_bot.send_message.assert_called_once_with(456, "Fixed")
+
+
+def test_cmd_debug_no_code_shows_usage():
+    with (
+        patch("bot.handlers.ask_ai") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_debug
+
+        cmd_debug(make_message(text="/debug"))
+        mock_ask.assert_not_called()
+        assert "Usage" in mock_bot.send_message.call_args[0][1]
+
+
+def test_cmd_review_calls_ask_ai_with_code():
+    with (
+        patch("bot.handlers.ask_ai", return_value="Looks good") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_review
+
+        cmd_review(make_message(text="/review def f(): pass"))
+        prompt = mock_ask.call_args[0][1]
+        assert "def f(): pass" in prompt
+        mock_bot.send_message.assert_called_once_with(456, "Looks good")
+
+
+def test_cmd_review_no_code_shows_usage():
+    with (
+        patch("bot.handlers.ask_ai") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_review
+
+        cmd_review(make_message(text="/review"))
+        mock_ask.assert_not_called()
+        assert "Usage" in mock_bot.send_message.call_args[0][1]
+
+
+def test_cmd_quiz_asks_question_and_registers_next_step():
+    with (
+        patch("bot.handlers.ask_ai", return_value="What is a list?") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_quiz
+
+        sent = MagicMock()
+        mock_bot.send_message.return_value = sent
+        cmd_quiz(make_message(text="/quiz python"))
+        assert "python" in mock_ask.call_args[0][1]
+        # the generated question is passed through to the grader as an extra arg
+        args = mock_bot.register_next_step_handler.call_args[0]
+        assert args[0] is sent
+        assert args[2] == "What is a list?"
+
+
+def test_cmd_quiz_no_topic_shows_usage():
+    with (
+        patch("bot.handlers.ask_ai") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_quiz
+
+        cmd_quiz(make_message(text="/quiz"))
+        mock_ask.assert_not_called()
+        assert "Usage" in mock_bot.send_message.call_args[0][1]
+
+
+def test_grade_quiz_scores_answer_with_question_context():
+    with (
+        patch("bot.handlers.ask_ai", return_value="Correct!") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _grade_quiz
+
+        _grade_quiz(make_message(text="a list is ordered"), "What is a list?")
+        prompt = mock_ask.call_args[0][1]
+        assert "What is a list?" in prompt
+        assert "a list is ordered" in prompt
+        mock_bot.send_message.assert_called_once_with(456, "Correct!")
+
+
+def test_grade_quiz_empty_answer_cancels():
+    with (
+        patch("bot.handlers.ask_ai") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _grade_quiz
+
+        msg = make_message()
+        msg.text = ""
+        _grade_quiz(msg, "What is a list?")
+        mock_ask.assert_not_called()
+        assert "cancelled" in mock_bot.send_message.call_args[0][1]
+
+
 # ── /about ────────────────────────────────────────────────────────────────────
 
 

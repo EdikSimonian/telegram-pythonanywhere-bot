@@ -161,6 +161,63 @@ def cmd_translate(message):
  )
  bot.send_message(message.chat.id, reply)
 
+@bot.message_handler(commands=["debug"], func=is_allowed)
+def cmd_debug(message):
+ code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not code:
+  bot.send_message(message.chat.id, "Usage: /debug <code>\nPaste the code that isn't working.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  "Find the bug in the following code. Explain what's wrong in 1-2 sentences, "
+  "then show the corrected code in a code block. If there is no bug, say so. "
+  f"Keep it concise. Reply with only the answer — no preamble.\n\nCode:\n{code}",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["review"], func=is_allowed)
+def cmd_review(message):
+ code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not code:
+  bot.send_message(message.chat.id, "Usage: /review <code>\nPaste the code you'd like reviewed.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  "Give a short, constructive code review of the following code. "
+  "Point out any bugs, style issues, and one concrete improvement. "
+  "Be encouraging and keep it concise. "
+  f"Reply with only the review — no preamble.\n\nCode:\n{code}",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["quiz"], func=is_allowed)
+def cmd_quiz(message):
+ topic = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not topic:
+  bot.send_message(message.chat.id, "Usage: /quiz <topic>  (e.g. /quiz python lists)")
+  return
+ question = ask_ai(
+  message.from_user.id,
+  f"Create one short quiz question about: {topic}. "
+  "Ask a single clear question that has a definite correct answer. "
+  "Do NOT reveal or hint at the answer. Reply with only the question — no preamble.",
+ )
+ sent = bot.send_message(message.chat.id, f"❓ {question}\n\nReply with your answer.")
+ bot.register_next_step_handler(sent, _grade_quiz, question)
+def _grade_quiz(message, question):
+ answer = (message.text or "").strip()
+ if not answer:
+  bot.send_message(message.chat.id, "No answer given — quiz cancelled.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  f"Quiz question: {question}\n"
+  f"Student's answer: {answer}\n\n"
+  "Say whether the answer is correct, then give the correct answer with a one-sentence "
+  "explanation. Be encouraging and concise.",
+ )
+ bot.send_message(message.chat.id, reply)
+
 @bot.message_handler(commands=["roll"], func=is_allowed)
 def cmd_roll(message):
  result = random.randint(1, 6)
@@ -241,6 +298,9 @@ def cmd_help(message):
         "/analogy — explain a concept by analogy",
         "/motivate — get a motivational boost",
         "/translate — translate code to another language",
+        "/debug — find the bug in your code",
+        "/review — get a short code review",
+        "/quiz — take a quick quiz on a topic",
         "/roll — roll the dice",
         "/roast — get roasted",
         "/remember — save a note",
@@ -338,3 +398,4 @@ def handle_message(message):
         print(f"Error in handle_message: {e}")
         bot.send_message(message.chat.id, "Something went wrong. Please try again.")
         _log(message, "out", f"[error] {e}")
+        
