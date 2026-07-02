@@ -191,11 +191,12 @@ def deploy():
         # error since the worker reload below will retry it.
         webhook_status = ""
         try:
-            from bot.clients import register_webhook
+            from bot.clients import register_commands, register_webhook
 
             webhook_status = "\n" + register_webhook()
+            webhook_status += "\n" + register_commands()
         except Exception as e:
-            webhook_status = f"\nWebhook registration failed: {e}"
+            webhook_status = f"\nWebhook/command registration failed: {e}"
 
         # Touch the PA WSGI file so the next request boots a fresh
         # worker with the new code. No-op when not running on PA;

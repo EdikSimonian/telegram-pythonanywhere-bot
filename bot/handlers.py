@@ -45,6 +45,45 @@ def _log(message, direction: str, text: str) -> None:
 
 
 
+# Single source of truth for the bot's command list. Drives both /help
+# and the Telegram "/" autocomplete menu (registered via set_my_commands
+# in bot.clients.register_commands). Add a new command here when you add
+# its handler, or it won't show up in the menu.
+COMMANDS = [
+    ("start", "welcome message"),
+    ("help", "show this message"),
+    ("reset", "clear conversation history"),
+    ("about", "about this bot"),
+    ("joke", "tell a programming joke"),
+    ("quote", "tell a coding quote"),
+    ("fact", "tell a coding fact"),
+    ("compliment", "give a compliment"),
+    ("explain", "explain a coding topic"),
+    ("challenge", "get a coding challenge"),
+    ("analogy", "explain a concept by analogy"),
+    ("motivate", "get a motivational boost"),
+    ("translate", "translate code to another language"),
+    ("debug", "find the bug in your code"),
+    ("review", "get a short code review"),
+    ("quiz", "take a quick quiz on a topic"),
+    ("summarize", "summarize a block of text"),
+    ("roll", "roll the dice"),
+    ("roast", "get roasted"),
+    ("remember", "save a note"),
+    ("recall", "list your notes"),
+    ("forget", "clear your notes"),
+]
+
+
+def command_menu():
+    """Full (command, description) list including the conditional /model
+    command. Shared by /help and the Telegram command-menu registration."""
+    cmds = list(COMMANDS)
+    if HF_SPACE_ID:
+        cmds.append(("model", "switch AI provider"))
+    return cmds
+
+
 @bot.message_handler(commands=["start"], func=is_allowed)
 def cmd_start(message):
     bot.send_message(
@@ -298,32 +337,7 @@ def cmd_forget(message):
 
 @bot.message_handler(commands=["help"], func=is_allowed)
 def cmd_help(message):
-    lines = [
-        "/start — welcome message",
-        "/help  — show this message",
-        "/reset — clear conversation history",
-        "/about — about this bot",
-        "/joke — tell a programming joke",
-        "/quote — tell a coding quote",
-        "/fact — tell a coding fact",
-        "/compliment — give a compliment",
-        "/explain — explain a coding topic",
-        "/challenge — get a coding challenge",
-        "/analogy — explain a concept by analogy",
-        "/motivate — get a motivational boost",
-        "/translate — translate code to another language",
-        "/debug — find the bug in your code",
-        "/review — get a short code review",
-        "/quiz — take a quick quiz on a topic",
-        "/summarize — summarize a block of text",
-        "/roll — roll the dice",
-        "/roast — get roasted",
-        "/remember — save a note",
-        "/recall — list your notes",
-        "/forget — clear your notes",
-    ]
-    if HF_SPACE_ID:
-        lines.append("/model — switch AI provider")
+    lines = [f"/{name} — {desc}" for name, desc in command_menu()]
     bot.send_message(message.chat.id, "\n".join(lines))
 
 

@@ -131,3 +131,25 @@ def register_webhook() -> str:
     if result is False:
         return f"Webhook registration: Telegram returned False for {WEBHOOK_URL}"
     return f"Webhook registered: {WEBHOOK_URL}"
+
+
+def register_commands() -> str:
+    """Register the bot's command menu with Telegram (set_my_commands) so
+    commands show up in the "/" autocomplete. Without this, handlers still
+    work when typed in full but nothing appears in the client's menu.
+
+    Idempotent — Telegram treats repeated set_my_commands with the same
+    list as a no-op. Never raises: a failure here must not crash worker
+    boot or fail a deploy. The command list is imported lazily to avoid a
+    circular import (bot.handlers imports from bot.clients)."""
+    try:
+        from bot.handlers import command_menu
+
+        cmds = [telebot.types.BotCommand(name, desc) for name, desc in command_menu()]
+        result = bot.set_my_commands(cmds)
+    except Exception as e:
+        return f"Command registration failed: {e}"
+
+    if result is False:
+        return "Command registration: Telegram returned False"
+    return f"Registered {len(cmds)} bot commands"
