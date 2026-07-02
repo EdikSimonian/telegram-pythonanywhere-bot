@@ -225,6 +225,34 @@ def test_grade_quiz_empty_answer_cancels():
         assert "cancelled" in mock_bot.send_message.call_args[0][1]
 
 
+# ── /summarize ──────────────────────────────────────────────────────────────────
+
+
+def test_cmd_summarize_calls_ask_ai_with_text():
+    with (
+        patch("bot.handlers.ask_ai", return_value="Short summary") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_summarize
+
+        cmd_summarize(make_message(text="/summarize a long article about bees"))
+        prompt = mock_ask.call_args[0][1]
+        assert "a long article about bees" in prompt
+        mock_bot.send_message.assert_called_once_with(456, "Short summary")
+
+
+def test_cmd_summarize_no_text_shows_usage():
+    with (
+        patch("bot.handlers.ask_ai") as mock_ask,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_summarize
+
+        cmd_summarize(make_message(text="/summarize"))
+        mock_ask.assert_not_called()
+        assert "Usage" in mock_bot.send_message.call_args[0][1]
+
+
 # ── /about ────────────────────────────────────────────────────────────────────
 
 

@@ -218,6 +218,20 @@ def _grade_quiz(message, question):
  )
  bot.send_message(message.chat.id, reply)
 
+@bot.message_handler(commands=["summarize"], func=is_allowed)
+def cmd_summarize(message):
+ text = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not text:
+  bot.send_message(message.chat.id, "Usage: /summarize <text>\nPaste the text you'd like summarized.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  "Summarize the following text concisely, capturing the key points as a short "
+  "paragraph or a few bullet points. Do not add opinions or information that isn't "
+  f"in the text. Reply with only the summary — no preamble.\n\nText:\n{text}",
+ )
+ bot.send_message(message.chat.id, reply)
+
 @bot.message_handler(commands=["roll"], func=is_allowed)
 def cmd_roll(message):
  result = random.randint(1, 6)
@@ -301,6 +315,7 @@ def cmd_help(message):
         "/debug — find the bug in your code",
         "/review — get a short code review",
         "/quiz — take a quick quiz on a topic",
+        "/summarize — summarize a block of text",
         "/roll — roll the dice",
         "/roast — get roasted",
         "/remember — save a note",
