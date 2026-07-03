@@ -19,7 +19,7 @@ HF_TEMPERATURE = 0.6
 HF_TOP_K = 30
 
 
-def _call_main(messages: list, retries: int = AI_RETRIES):
+def _call_main(messages: list, model: str = MODEL, retries: int = AI_RETRIES):
     """Call the OpenAI-compatible API with bounded retries.
 
     Each attempt is capped by AI_REQUEST_TIMEOUT and the per-attempt timeout
@@ -34,7 +34,7 @@ def _call_main(messages: list, retries: int = AI_RETRIES):
         timeout = min(AI_REQUEST_TIMEOUT, remaining)
         try:
             response = ai.chat.completions.create(
-                model=MODEL,
+                model=model,
                 messages=messages,
                 timeout=timeout,
             )
@@ -101,8 +101,15 @@ def _call_hf(messages: list) -> str:
 
 
 def generate(user_id: int, messages: list) -> str:
-    """Dispatch to the user's chosen AI provider and return a reply string."""
+    """Dispatch to the user's chosen AI provider and return a reply string.
+
+    The stored provider can be:
+    - "hf" for the optional Hugging Face space
+    - "main" for the default Cerebras model from AI_MODEL
+    - an explicit Cerebras model ID like `qwen-3-235b-a22b-instruct-2507`
+    """
     provider = get_provider(user_id)
     if provider == "hf":
         return _call_hf(messages)
-    return _call_main(messages)
+    model = MODEL if provider == "main" else provider
+    return _call_main(messages, model=model)

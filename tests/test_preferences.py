@@ -18,7 +18,8 @@ def test_get_provider_returns_saved_main():
 
 def test_get_provider_returns_saved_hf_when_configured():
     with patch("bot.preferences.store") as mock_store, \
-         patch("bot.preferences.HF_SPACE_ID", "fake/space"):
+         patch("bot.preferences.HF_SPACE_ID", "fake/space"), \
+         patch("bot.handlers.HF_SPACE_ID", "fake/space"):
         mock_store.get.return_value = "hf"
         from bot.preferences import get_provider
         assert get_provider(123) == "hf"
@@ -27,7 +28,8 @@ def test_get_provider_returns_saved_hf_when_configured():
 def test_get_provider_falls_back_to_default_when_hf_not_configured():
     """Saved value is 'hf' but HF_SPACE_ID is empty — fall back."""
     with patch("bot.preferences.store") as mock_store, \
-         patch("bot.preferences.HF_SPACE_ID", ""):
+         patch("bot.preferences.HF_SPACE_ID", ""), \
+         patch("bot.handlers.HF_SPACE_ID", ""):
         mock_store.get.return_value = "hf"
         from bot.preferences import get_provider
         assert get_provider(123) == "main"

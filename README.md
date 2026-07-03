@@ -1,6 +1,8 @@
 # Telegram Bot — PythonAnywhere Starter Template
 
-A minimal Python Telegram bot running on PythonAnywhere (free tier) with persistent conversation memory in SQLite and AI powered by Cerebras (defaults to `gpt-oss-120b` — strong reasoning at Cerebras speed; `qwen-3-235b-a22b-instruct-2507` is also available).
+A minimal Python Telegram bot running on PythonAnywhere (free tier) with persistent conversation memory in SQLite and AI powered by Cerebras (defaults to `gpt-oss-120b` — strong reasoning at Cerebras speed; users can also switch to other Cerebras models such as `qwen-3-235b-a22b-instruct-2507`).
+
+Use `/models` to see the supported Cerebras options and `/model <name>` to switch.
 
 **Stack:** Python · Flask · pyTelegramBotAPI · OpenAI SDK · SQLite · PythonAnywhere
 
@@ -369,7 +371,7 @@ Reload (or push) for the change to take effect: the list is read at worker boot.
 | What to change | How |
 |---|---|
 | Bot personality / instructions | Edit `SYSTEM_PROMPT` in `bot/config.py` |
-| AI model | Set `AI_MODEL` env var (free-tier tested: `gpt-oss-120b` (default), `qwen-3-235b-a22b-instruct-2507`) |
+| AI model | Set `AI_MODEL` env var (free-tier tested: `gpt-oss-120b` (default), `qwen-3-235b-a22b-instruct-2507`; switchable via `/models` and `/model <name>`) |
 | AI provider | Set `AI_BASE_URL` env var (any OpenAI-compatible endpoint) |
 | Secure the webhook | Auto-generated on first boot — see "Secure the webhook" above |
 | Restrict who can use the bot | Set `ALLOWED_USERS` env var |

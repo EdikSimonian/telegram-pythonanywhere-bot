@@ -360,7 +360,7 @@ def test_available_models_main_only_without_hf():
         patch("bot.handlers.MODEL", "gpt-oss-120b"),
     ):
         models = bot.handlers.available_models()
-        assert [m["key"] for m in models] == ["main"]
+        assert [m["key"] for m in models] == ["main", "qwen-3-235b-a22b-instruct-2507"]
         assert models[0]["name"] == "gpt-oss-120b"
         assert models[0]["description"]
 
@@ -368,9 +368,12 @@ def test_available_models_main_only_without_hf():
 def test_available_models_includes_hf_when_configured():
     import bot.handlers
 
-    with patch("bot.handlers.HF_SPACE_ID", "fake/space"):
+    with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+    ):
         keys = [m["key"] for m in bot.handlers.available_models()]
-        assert keys == ["main", "hf"]
+        assert keys == ["main", "qwen-3-235b-a22b-instruct-2507", "hf"]
 
 
 def test_active_model_reflects_provider():
@@ -405,6 +408,7 @@ def test_resolve_model_matches_key_and_name():
         assert bot.handlers._resolve_model("ArmGPT")["key"] == "hf"
         assert bot.handlers._resolve_model("MAIN")["key"] == "main"
         assert bot.handlers._resolve_model("gpt-oss-120b")["key"] == "main"
+        assert bot.handlers._resolve_model("qwen-3-235b-a22b-instruct-2507")["key"] == "qwen-3-235b-a22b-instruct-2507"
         assert bot.handlers._resolve_model("nope") is None
 
 
@@ -539,13 +543,13 @@ def test_cmd_models_single_model_no_switch_hint():
 
     with (
         patch("bot.handlers.HF_SPACE_ID", ""),
-        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+        patch("bot.handlers.MODEL", "qwen-3-235b-a22b-instruct-2507"),
         patch("bot.handlers.get_provider", return_value="main"),
         patch("bot.handlers.bot") as mock_bot,
     ):
         cmd_models(make_message(text="/models"))
         sent = mock_bot.send_message.call_args[0][1]
-        main_line = next(line for line in sent.splitlines() if "gpt-oss-120b" in line)
+        main_line = next(line for line in sent.splitlines() if "qwen-3-235b-a22b-instruct-2507" in line)
         assert "active" in main_line
         assert "Switch with" not in sent
 

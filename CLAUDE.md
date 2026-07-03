@@ -118,16 +118,18 @@ The bot uses the OpenAI Python SDK pointed at any OpenAI-compatible endpoint. Sw
 
 ## Multi-provider support
 
-The bot can dispatch requests to one of two providers per user. Provider identifiers are **`main`** and **`hf`** — both in code (`VALID_PROVIDERS`, `DEFAULT_PROVIDER`, store values) and in the user-facing `/model` command:
+The bot can dispatch requests to one of several supported models per user. Provider identifiers include **`main`**, explicit Cerebras model IDs like `qwen-3-235b-a22b-instruct-2507`, and **`hf`**.
 
-1. **`main`** (default) — any OpenAI-compatible endpoint via `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`. `_call_main()` in `bot/providers.py` has retry logic (3 attempts with exponential backoff: 1s, 2s). Named "main" rather than "openai" to avoid confusing kids who might think it's tied to OpenAI Inc. — the endpoint is *OpenAI-compatible* (a protocol) but the actual provider is usually Cerebras or similar.
-2. **`hf`** (optional) — a Hugging Face Gradio space set via `HF_SPACE_ID` (with optional `HF_TOKEN` for private spaces). Called via `gradio_client.Client(...).predict(prompt, length, temperature, top_k, api_name="/generate")`. No retry (HF is slow).
+1. **`main`** (default) — the default Cerebras model from `AI_MODEL`.
+2. **`qwen-3-235b-a22b-instruct-2507`** — another supported Cerebras model ID available in the template.
+3. **`hf`** (optional) — a Hugging Face Gradio space set via `HF_SPACE_ID` (with optional `HF_TOKEN` for private spaces). Called via `gradio_client.Client(...).predict(prompt, length, temperature, top_k, api_name="/generate")`. No retry (HF is slow).
 
-**When `HF_SPACE_ID` is empty, the bot works exactly as a single-provider setup** — the `/model` command is not registered and users always hit the main (OpenAI-compatible) endpoint.
+**When `HF_SPACE_ID` is empty, the bot still supports multiple Cerebras model IDs** — `/model` and `/models` let users switch between the default Cerebras model and supported alternate IDs.
 
-**When `HF_SPACE_ID` is set**, users get a `/model` command:
-- `/model` — show current provider + options
-- `/model main` — switch to the OpenAI-compatible endpoint
+**When `HF_SPACE_ID` is set**, users also get an HF option:
+- `/model` — show current model and options
+- `/model main` — switch to the default Cerebras model
+- `/model qwen-3-235b-a22b-instruct-2507` — switch to the alternate Cerebras model
 - `/model hf` — switch to the HF space
 
 Preferences are stored via `store` under `provider:{user_id}` (no TTL). If the store is not configured (stateless mode), the bot falls back to `DEFAULT_PROVIDER` (`"main"`).
