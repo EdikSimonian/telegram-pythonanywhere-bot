@@ -65,6 +65,13 @@ COMMANDS = [
     ("translate", "translate code to another language"),
     ("debug", "find the bug in your code"),
     ("review", "get a short code review"),
+    ("optimize", "optimize code for speed and clarity"),
+    ("test", "generate unit tests for your code"),
+    ("document", "add docstrings and comments to code"),
+    ("complexity", "analyze time & space complexity"),
+    ("regex", "build or explain a regular expression"),
+    ("convert", "convert numbers, bases, and units"),
+    ("cheatsheet", "quick reference for a topic"),
     ("quiz", "take a quick quiz on a topic"),
     ("summarize", "summarize a block of text"),
     ("roll", "roll the dice"),
@@ -228,6 +235,206 @@ def cmd_review(message):
   f"Reply with only the review — no preamble.\n\nCode:\n{code}",
  )
  bot.send_message(message.chat.id, reply)
+
+
+# --- New coding tools -------------------------------------------------------
+
+@bot.message_handler(commands=["optimize"], func=is_allowed)
+def cmd_optimize(message):
+    code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not code:
+        bot.send_message(message.chat.id, "Usage: /optimize <code>\nPaste the code you'd like optimized.")
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Optimize the following code for performance and readability. "
+        "Note what you improved in 1-2 sentences, then show the optimized version "
+        "in a code block. Keep the same behavior. "
+        f"Reply with only the answer — no preamble.\n\nCode:\n{code}",
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["test"], func=is_allowed)
+def cmd_test(message):
+    code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not code:
+        bot.send_message(message.chat.id, "Usage: /test <code>\nPaste the function or code you'd like tests for.")
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write clear unit tests for the following code. Cover the main cases plus one "
+        "or two edge cases, using the language's standard testing style. "
+        f"Reply with only the tests in a code block — no preamble.\n\nCode:\n{code}",
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["document"], func=is_allowed)
+def cmd_document(message):
+    code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not code:
+        bot.send_message(message.chat.id, "Usage: /document <code>\nPaste the code you'd like documented.")
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Add clear docstrings and brief inline comments to the following code. "
+        "Do not change what the code does. Keep comments concise and useful. "
+        f"Reply with only the documented code in a code block — no preamble.\n\nCode:\n{code}",
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["complexity"], func=is_allowed)
+def cmd_complexity(message):
+    code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not code:
+        bot.send_message(message.chat.id, "Usage: /complexity <code>\nPaste the code you'd like analyzed.")
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Analyze the time and space complexity (Big-O) of the following code. "
+        "State both clearly, then explain why in 1-2 sentences. If it can be improved, "
+        f"mention the better complexity briefly. Reply with only the analysis — no preamble.\n\nCode:\n{code}",
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["regex"], func=is_allowed)
+def cmd_regex(message):
+    desc = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not desc:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /regex <what to match>\nExample: /regex a valid email address",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        f"Create a regular expression for: {desc}. Show the regex in a code block, then "
+        "explain each part in a few short bullet points and give one matching example. "
+        "Keep it concise. Reply with only the answer — no preamble.",
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["cheatsheet"], func=is_allowed)
+def cmd_cheatsheet(message):
+    topic = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not topic:
+        bot.send_message(message.chat.id, "Usage: /cheatsheet <topic>  (e.g. /cheatsheet git)")
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        f"Create a short, practical cheatsheet for: {topic}. List the most useful commands "
+        "or concepts with a one-line description each, grouped if it helps. Keep it compact "
+        "and skimmable. Reply with only the cheatsheet — no preamble.",
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+# --- Converter --------------------------------------------------------------
+# /convert does exact number-base math itself (bin/oct/dec/hex) and only falls
+# back to the AI for everything else (units, temperature, etc.). That keeps the
+# common case instant and reliable instead of guessing.
+
+# Base names users can type -> numeric base.
+_BASES = {
+    "bin": 2, "binary": 2,
+    "oct": 8, "octal": 8,
+    "dec": 10, "decimal": 10,
+    "hex": 16, "hexadecimal": 16,
+}
+
+
+def _try_base_convert(arg):
+    """Try an exact number-base conversion (bin/oct/dec/hex).
+
+    Returns a formatted result string on success, or None if `arg` doesn't
+    look like a base conversion — so the caller can fall back to the AI.
+
+    Understands:
+      "255 to hex"      decimal in, hex out
+      "0xff to dec"     0x / 0o / 0b prefixes set the source base
+      "ff hex to bin"   an explicit source-base word also works
+    """
+    tokens = arg.lower().split()
+    if "to" not in tokens:
+        return None
+    i = tokens.index("to")
+    left, right = tokens[:i], tokens[i + 1:]
+    if not left or not right:
+        return None
+
+    target = right[0]
+    if target not in _BASES:
+        return None
+    target_base = _BASES[target]
+
+    raw = left[0]
+    src_base = _BASES[left[1]] if len(left) >= 2 and left[1] in _BASES else None
+
+    # Fall back to 0x/0o/0b prefixes when no source-base word was given.
+    if src_base is None:
+        if raw.startswith("0x"):
+            src_base, raw = 16, raw[2:]
+        elif raw.startswith("0o"):
+            src_base, raw = 8, raw[2:]
+        elif raw.startswith("0b"):
+            src_base, raw = 2, raw[2:]
+        else:
+            src_base = 10  # bare numbers are read as decimal
+
+    if not raw:
+        return None
+    try:
+        value = int(raw, src_base)
+    except ValueError:
+        return None  # not valid in that base -> let the AI handle it
+
+    sign = "-" if value < 0 else ""
+    mag = abs(value)
+    formats = {2: "b", 8: "o", 16: "x"}
+    if target_base in formats:
+        body = format(mag, formats[target_base])
+        prefix = {2: "0b", 8: "0o", 16: "0x"}[target_base]
+    else:
+        body = str(mag)
+        prefix = ""
+    return f"{arg} = {sign}{prefix}{body}"
+
+
+@bot.message_handler(commands=["convert"], func=is_allowed)
+def cmd_convert(message):
+    arg = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /convert <value> to <target>\n\n"
+            "Number bases (instant, exact):\n"
+            "  /convert 255 to hex\n"
+            "  /convert 0xff to dec\n"
+            "  /convert 0b1010 to dec\n"
+            "  /convert ff hex to bin\n\n"
+            "Units and everything else (via AI, approximate):\n"
+            "  /convert 10 km to miles\n"
+            "  /convert 100 C to F",
+        )
+        return
+    # Fast path: exact base conversion, no AI call needed.
+    result = _try_base_convert(arg)
+    if result is not None:
+        bot.send_message(message.chat.id, result)
+        return
+    # Fallback: let the AI handle units, temperature, and the rest.
+    reply = ask_ai(
+        message.from_user.id,
+        f"Convert this value: {arg}. Give the final converted value with its unit, "
+        "rounded sensibly. If the conversion is ambiguous or impossible, say so in one "
+        "line. Reply with only the result — no preamble.",
+    )
+    bot.send_message(message.chat.id, reply)
+
 
 @bot.message_handler(commands=["quiz"], func=is_allowed)
 def cmd_quiz(message):
@@ -427,4 +634,3 @@ def handle_message(message):
         print(f"Error in handle_message: {e}")
         bot.send_message(message.chat.id, "Something went wrong. Please try again.")
         _log(message, "out", f"[error] {e}")
-        
