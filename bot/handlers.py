@@ -37,52 +37,47 @@ def _log(message, direction: str, text: str) -> None:
 # ----------------------------
 
 COMMANDS = [
-    ("start", "Start the bot and see the welcome message"),
+    ("start", "Start the bot"),
+    ("help", "Show commands"),
+    ("reset", "Clear chat history"),
+    ("about", "Bot info"),
+    ("sha", "Git version"),
+    ("model", "View/switch model"),
+    ("models", "List models"),
 
-    ("help", "Show all available commands with detailed explanations"),
+    ("joke", "Programming joke"),
+    ("quote", "Programming quote"),
+    ("fact", "Tech fact"),
+    ("compliment", "Motivation boost"),
 
-    ("reset", "Clear your chat history and start a fresh conversation"),
+    ("explain", "Explain a topic"),
+    ("challenge", "Coding challenge"),
+    ("analogy", "Explain via analogy"),
+    ("motivate", "Motivation"),
+    ("translate", "Code translation"),
+    ("debug", "Debug code"),
+    ("review", "Code review"),
+    ("quiz", "Ask a quiz question"),
+    ("summarize", "Summarize text"),
 
-    ("about", "Show bot information including model, version, and system status"),
+    ("convert", "Convert text/data formats"),
 
-    ("sha", "Display the current deployed git commit version (debugging info)"),
+    ("roadmap", "Learning roadmap"),
+    ("streak", "Track progress"),
+    ("interview", "Mock interview"),
+    ("run", "Predict code output"),
 
-    ("model", "View or switch the AI model used for your responses"),
-    ("models", "List all available AI models and their capabilities"),
+    ("roll", "Dice roll"),
+    ("roast", "Roast someone"),
 
-    ("joke", "Get a short, clean programming or tech-related joke"),
-    ("quote", "Receive a meaningful quote about programming or software engineering"),
-    ("fact", "Learn a surprising and interesting fact about computing or technology"),
-    ("compliment", "Get a personalized and encouraging compliment"),
-
-    ("explain", "Explain a programming concept in a simple, beginner-friendly way"),
-    ("challenge", "Receive a small coding challenge to practice problem-solving skills"),
-    ("analogy", "Understand a technical concept through a real-world analogy"),
-    ("motivate", "Get motivational encouragement for learning programming"),
-    ("translate", "Translate code from one programming language to another"),
-    ("debug", "Find and explain bugs in your code with a corrected version"),
-    ("review", "Get a constructive code review with improvement suggestions"),
-    ("quiz", "Take a short programming quiz and receive instant feedback"),
-    ("summarize", "Summarize long text into key points or concise explanation"),
-
-    ("convert", "Convert files between formats (text, JSON, CSV, images where supported)"),
-
-    ("roadmap", "Generate a structured learning path from beginner to advanced level"),
-    ("streak", "Track your daily learning streak and progress consistency"),
-    ("interview", "Simulate a real technical interview with questions and evaluation"),
-    ("run", "Simulate code execution and predict its output step by step"),
-
-    ("roll", "Roll a virtual dice (1–6) for random decision making"),
-    ("roast", "Get a humorous, light roast based on a given name"),
-
-    ("remember", "Save a personal note or important information"),
-    ("recall", "Retrieve all previously saved notes"),
-    ("forget", "Delete all saved notes permanently"),
+    ("remember", "Save note"),
+    ("recall", "Show notes"),
+    ("forget", "Delete notes"),
 ]
 
 
 # ----------------------------
-# MODELS (Cerebras only + HF optional)
+# MODELS
 # ----------------------------
 
 CEREBRAS_MODELS = [
@@ -114,13 +109,10 @@ def available_models():
 
 def active_model(user_id):
     provider = get_provider(user_id)
-    models = available_models()
-
-    for m in models:
+    for m in available_models():
         if m["key"] == provider:
             return m
-
-    return models[0]
+    return available_models()[0]
 
 
 def _resolve_model(choice, models=None):
@@ -136,8 +128,8 @@ def _resolve_model(choice, models=None):
     return None
 
 
-def command_menu():
-    return list(COMMANDS)
+def _ask(user_id, prompt):
+    return ask_ai(user_id, prompt)
 
 
 # ----------------------------
@@ -148,9 +140,9 @@ def command_menu():
 def cmd_start(message):
     bot.send_message(
         message.chat.id,
-        "Hi! I'm your AI coding assistant.\n\n"
-        "Use /help to see what I can do."
+        "AI coding assistant ready.\nUse /help."
     )
+
 
 @bot.message_handler(commands=["help"], func=is_allowed)
 def cmd_help(message):
@@ -188,13 +180,12 @@ def cmd_sha(message):
 
 
 # ----------------------------
-# MODEL SWITCHING
+# MODEL SWITCH
 # ----------------------------
 
 @bot.message_handler(commands=["model"], func=is_allowed)
 def cmd_model(message):
     parts = message.text.split(maxsplit=1)
-
     models = available_models()
 
     if len(parts) == 1:
@@ -225,12 +216,8 @@ def cmd_models(message):
 
 
 # ----------------------------
-# AI FUN COMMANDS
+# AI SHORTCUTS
 # ----------------------------
-
-def _ask(user_id, prompt):
-    return ask_ai(user_id, prompt)
-
 
 @bot.message_handler(commands=["joke"], func=is_allowed)
 def cmd_joke(m):
@@ -249,16 +236,16 @@ def cmd_fact(m):
 
 @bot.message_handler(commands=["compliment"], func=is_allowed)
 def cmd_compliment(m):
-    bot.send_message(m.chat.id, _ask(m.from_user.id, "compliment about learning"))
+    bot.send_message(m.chat.id, _ask(m.from_user.id, "encouraging message for programmer"))
 
 
 @bot.message_handler(commands=["motivate"], func=is_allowed)
 def cmd_motivate(m):
-    bot.send_message(m.chat.id, _ask(m.from_user.id, "motivation for coding student"))
+    bot.send_message(m.chat.id, _ask(m.from_user.id, "motivation for learning coding"))
 
 
 # ----------------------------
-# LEARNING COMMANDS
+# LEARNING
 # ----------------------------
 
 @bot.message_handler(commands=["explain"], func=is_allowed)
@@ -266,7 +253,8 @@ def cmd_explain(m):
     topic = m.text.split(maxsplit=1)[1] if " " in m.text else ""
     if not topic:
         return bot.send_message(m.chat.id, "Usage: /explain <topic>")
-    bot.send_message(m.chat.id, _ask(m.from_user.id, f"explain {topic} simply"))
+
+    bot.send_message(m.chat.id, _ask(m.from_user.id, f"Explain {topic} simply"))
 
 
 @bot.message_handler(commands=["challenge"], func=is_allowed)
@@ -279,8 +267,13 @@ def cmd_analogy(m):
     topic = m.text.split(maxsplit=1)[1] if " " in m.text else ""
     if not topic:
         return bot.send_message(m.chat.id, "Usage: /analogy <concept>")
+
     bot.send_message(m.chat.id, _ask(m.from_user.id, f"analogy for {topic}"))
 
+
+# ----------------------------
+# FIXED QUIZ (IMPORTANT)
+# ----------------------------
 
 @bot.message_handler(commands=["quiz"], func=is_allowed)
 def cmd_quiz(m):
@@ -288,41 +281,82 @@ def cmd_quiz(m):
     if not topic:
         return bot.send_message(m.chat.id, "Usage: /quiz <topic>")
 
-    q = _ask(m.from_user.id, f"quiz question about {topic}")
-    sent = bot.send_message(m.chat.id, q)
-    bot.register_next_step_handler(sent, lambda msg: _grade_quiz(msg, q))
-
-
-def _grade_quiz(message, question):
-    ans = message.text
-    bot.send_message(
-        message.chat.id,
-        _ask(message.from_user.id, f"Q:{question} A:{ans} grade")
+    question = _ask(
+        m.from_user.id,
+        f"Create ONE clear multiple-choice or short-answer question about {topic}. No answer included."
     )
 
+    sent = bot.send_message(m.chat.id, question)
+
+    bot.register_next_step_handler(
+        sent,
+        lambda msg: _grade_quiz(msg, topic, question)
+    )
+
+
+def _grade_quiz(message, topic, question):
+    ans = message.text
+
+    result = _ask(
+        message.from_user.id,
+        f"""
+Grade this answer.
+
+Topic: {topic}
+Question: {question}
+Answer: {ans}
+
+Return:
+- score 0-10
+- short explanation
+- correct answer if needed
+"""
+    )
+
+    bot.send_message(message.chat.id, result)
+
+
+# ----------------------------
+# SUMMARIZE
+# ----------------------------
 
 @bot.message_handler(commands=["summarize"], func=is_allowed)
 def cmd_summarize(m):
     text = m.text.split(maxsplit=1)[1] if " " in m.text else ""
     if not text:
         return bot.send_message(m.chat.id, "Usage: /summarize <text>")
+
     bot.send_message(m.chat.id, _ask(m.from_user.id, f"summarize: {text}"))
 
 
 # ----------------------------
-# NEW FEATURES
+# CONVERT (FIXED - TEXT BASED)
 # ----------------------------
 
 @bot.message_handler(commands=["convert"], func=is_allowed)
 def cmd_convert(m):
-    bot.send_message(m.chat.id, "File conversion placeholder (no ffmpeg).")
+    payload = m.text.split(maxsplit=1)[1] if " " in m.text else ""
+    if not payload:
+        return bot.send_message(m.chat.id, "Usage: /convert <instruction + data>")
 
+    result = _ask(
+        m.from_user.id,
+        f"Convert this as requested:\n\n{payload}"
+    )
+
+    bot.send_message(m.chat.id, result)
+
+
+# ----------------------------
+# OTHER FEATURES
+# ----------------------------
 
 @bot.message_handler(commands=["roadmap"], func=is_allowed)
 def cmd_roadmap(m):
     topic = m.text.split(maxsplit=1)[1] if " " in m.text else ""
     if not topic:
         return bot.send_message(m.chat.id, "Usage: /roadmap <topic>")
+
     bot.send_message(m.chat.id, _ask(m.from_user.id, f"learning roadmap for {topic}"))
 
 
@@ -334,6 +368,7 @@ def cmd_streak(m):
     key = f"streak:{m.from_user.id}"
     val = int(store.get(key) or 0) + 1
     store.set(key, str(val))
+
     bot.send_message(m.chat.id, f"🔥 Streak: {val}")
 
 
@@ -347,11 +382,12 @@ def cmd_run(m):
     code = m.text.split(maxsplit=1)[1] if " " in m.text else ""
     if not code:
         return bot.send_message(m.chat.id, "Usage: /run <code>")
-    bot.send_message(m.chat.id, _ask(m.from_user.id, f"predict output: {code}"))
+
+    bot.send_message(m.chat.id, _ask(m.from_user.id, f"predict output of code: {code}"))
 
 
 # ----------------------------
-# FUN + NOTES
+# FUN
 # ----------------------------
 
 @bot.message_handler(commands=["roll"], func=is_allowed)
@@ -369,6 +405,10 @@ def _do_roast(m):
     name = m.text
     bot.send_message(m.chat.id, _ask(m.from_user.id, f"roast {name}"))
 
+
+# ----------------------------
+# NOTES
+# ----------------------------
 
 @bot.message_handler(commands=["remember"], func=is_allowed)
 def cmd_remember(m):
@@ -415,8 +455,7 @@ def handle_message(message):
     _log(message, "in", text)
 
     if is_rate_limited(message.from_user.id):
-        msg = f"Rate limit reached ({RATE_LIMIT})"
-        bot.send_message(message.chat.id, msg)
+        bot.send_message(message.chat.id, f"Rate limit reached ({RATE_LIMIT})")
         return
 
     try:
