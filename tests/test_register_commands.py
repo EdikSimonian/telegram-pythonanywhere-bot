@@ -19,13 +19,16 @@ def test_command_menu_includes_expected_commands():
     assert all(name and desc for name, desc in command_menu())
 
 
-def test_command_menu_model_conditional_on_hf():
+def test_command_menu_includes_model_commands():
+    """/model and /models are always registered, regardless of HF config —
+    they introspect the active model even on single-model deployments."""
     import bot.handlers
 
-    with patch("bot.handlers.HF_SPACE_ID", ""):
-        assert "model" not in [n for n, _ in bot.handlers.command_menu()]
-    with patch("bot.handlers.HF_SPACE_ID", "fake/space"):
-        assert "model" in [n for n, _ in bot.handlers.command_menu()]
+    for hf in ("", "fake/space"):
+        with patch("bot.handlers.HF_SPACE_ID", hf):
+            names = [n for n, _ in bot.handlers.command_menu()]
+            assert "model" in names
+            assert "models" in names
 
 
 def test_register_commands_calls_set_my_commands():

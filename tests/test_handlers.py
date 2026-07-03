@@ -320,105 +320,209 @@ def test_cmd_about_without_store():
         assert "stateless" in sent
 
 
-# ── /model command ────────────────────────────────────────────────────────────
+# ── model registry (available_models / active_model / _resolve_model) ───────────
+
+# available_models() reads bot.handlers.MODEL and bot.handlers.HF_SPACE_ID, so
+# tests patch those to shape the registry. active_model() also reads
+# get_provider(). All are patchable at the handler level — no module reload.
 
 
-def _import_cmd_model_with_hf_enabled():
-    """Re-import handlers module with HF_SPACE_ID set so cmd_model exists."""
-    import importlib
-    import bot.config
+def test_available_models_main_only_without_hf():
     import bot.handlers
 
-    original = bot.config.HF_SPACE_ID
-    bot.config.HF_SPACE_ID = "fake/space"
-    # Also patch the import in handlers module (already imported via `from ... import HF_SPACE_ID`)
-    bot.handlers.HF_SPACE_ID = "fake/space"
-    importlib.reload(bot.handlers)
-    cmd_model = getattr(bot.handlers, "cmd_model", None)
-    # Restore
-    bot.config.HF_SPACE_ID = original
-    bot.handlers.HF_SPACE_ID = original
-    return cmd_model
-
-
-def test_cmd_model_no_args_shows_current():
-    cmd_model = _import_cmd_model_with_hf_enabled()
-    assert cmd_model is not None
     with (
+        patch("bot.handlers.HF_SPACE_ID", ""),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+    ):
+        models = bot.handlers.available_models()
+        assert [m["key"] for m in models] == ["main"]
+        assert models[0]["name"] == "gpt-oss-120b"
+        assert models[0]["description"]
+
+
+def test_available_models_includes_hf_when_configured():
+    import bot.handlers
+
+    with patch("bot.handlers.HF_SPACE_ID", "fake/space"):
+        keys = [m["key"] for m in bot.handlers.available_models()]
+        assert keys == ["main", "hf"]
+
+
+def test_active_model_reflects_provider():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.get_provider", return_value="hf"),
+    ):
+        assert bot.handlers.active_model(123)["key"] == "hf"
+
+
+def test_active_model_falls_back_when_provider_unavailable():
+    """A stale 'hf' preference with HF now unset falls back to main."""
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", ""),
+        patch("bot.handlers.get_provider", return_value="hf"),
+    ):
+        assert bot.handlers.active_model(123)["key"] == "main"
+
+
+def test_resolve_model_matches_key_and_name():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+    ):
+        assert bot.handlers._resolve_model("hf")["key"] == "hf"
+        assert bot.handlers._resolve_model("ArmGPT")["key"] == "hf"
+        assert bot.handlers._resolve_model("MAIN")["key"] == "main"
+        assert bot.handlers._resolve_model("gpt-oss-120b")["key"] == "main"
+        assert bot.handlers._resolve_model("nope") is None
+
+
+# ── /model command ──────────────────────────────────────────────────────────────
+
+
+def test_cmd_model_no_args_shows_current_single_model():
+    from bot.handlers import cmd_model
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", ""),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
         patch("bot.handlers.get_provider", return_value="main"),
         patch("bot.handlers.bot") as mock_bot,
     ):
-        msg = make_message(text="/model")
-        cmd_model(msg)
+        cmd_model(make_message(text="/model"))
         sent = mock_bot.send_message.call_args[0][1]
-        assert "Current provider: main" in sent
-        assert "/model main" in sent
-        assert "/model hf" in sent
+        assert sent == "Current model: gpt-oss-120b"
+
+
+def test_cmd_model_no_args_hints_switch_when_multiple():
+    from bot.handlers import cmd_model
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+        patch("bot.handlers.get_provider", return_value="main"),
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        cmd_model(make_message(text="/model"))
+        sent = mock_bot.send_message.call_args[0][1]
+        assert "Current model: gpt-oss-120b" in sent
+        assert "/models" in sent
 
 
 def test_cmd_model_switch_to_hf():
-    cmd_model = _import_cmd_model_with_hf_enabled()
+    from bot.handlers import cmd_model
+
     with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
         patch("bot.handlers.set_provider", return_value=True) as mock_set,
         patch("bot.handlers.bot") as mock_bot,
     ):
-        msg = make_message(text="/model hf")
-        cmd_model(msg)
+        cmd_model(make_message(text="/model hf"))
         mock_set.assert_called_once_with(123, "hf")
         sent = mock_bot.send_message.call_args[0][1]
         assert "hf" in sent
         assert "Armenian" in sent
 
 
-def test_cmd_model_switch_to_main():
-    cmd_model = _import_cmd_model_with_hf_enabled()
+def test_cmd_model_switch_by_display_name():
+    """Switching accepts the display name, not just the provider key."""
+    from bot.handlers import cmd_model
+
     with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.set_provider", return_value=True) as mock_set,
+        patch("bot.handlers.bot"),
+    ):
+        cmd_model(make_message(text="/model ArmGPT"))
+        mock_set.assert_called_once_with(123, "hf")
+
+
+def test_cmd_model_switch_to_main():
+    from bot.handlers import cmd_model
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
         patch("bot.handlers.set_provider", return_value=True) as mock_set,
         patch("bot.handlers.bot") as mock_bot,
     ):
-        msg = make_message(text="/model main")
-        cmd_model(msg)
+        cmd_model(make_message(text="/model main"))
         mock_set.assert_called_once_with(123, "main")
         sent = mock_bot.send_message.call_args[0][1]
         assert "Main" in sent
+        assert "gpt-oss-120b" in sent
 
 
-def test_cmd_model_invalid_choice():
-    cmd_model = _import_cmd_model_with_hf_enabled()
+def test_cmd_model_unknown_choice():
+    from bot.handlers import cmd_model
+
     with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
         patch("bot.handlers.set_provider") as mock_set,
         patch("bot.handlers.bot") as mock_bot,
     ):
-        msg = make_message(text="/model bogus")
-        cmd_model(msg)
+        cmd_model(make_message(text="/model bogus"))
         mock_set.assert_not_called()
-        assert "Invalid" in mock_bot.send_message.call_args[0][1]
+        assert "Unknown model" in mock_bot.send_message.call_args[0][1]
 
 
-def test_cmd_model_redis_error_reports_failure():
-    cmd_model = _import_cmd_model_with_hf_enabled()
+def test_cmd_model_save_failure_reports_error():
+    from bot.handlers import cmd_model
+
     with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
         patch("bot.handlers.set_provider", return_value=False),
         patch("bot.handlers.bot") as mock_bot,
     ):
-        msg = make_message(text="/model hf")
-        cmd_model(msg)
+        cmd_model(make_message(text="/model hf"))
         assert "Could not save" in mock_bot.send_message.call_args[0][1]
 
 
-def test_cmd_model_not_registered_without_hf_space_id():
-    """When HF_SPACE_ID is empty, cmd_model should not exist."""
-    import importlib
-    import bot.config
-    import bot.handlers
+# ── /models command ─────────────────────────────────────────────────────────────
 
-    bot.config.HF_SPACE_ID = ""
-    bot.handlers.HF_SPACE_ID = ""
-    # reload() doesn't delete existing attributes, so clear it first
-    if hasattr(bot.handlers, "cmd_model"):
-        delattr(bot.handlers, "cmd_model")
-    importlib.reload(bot.handlers)
-    assert not hasattr(bot.handlers, "cmd_model")
+
+def test_cmd_models_lists_all_with_active_marker():
+    from bot.handlers import cmd_models
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+        patch("bot.handlers.get_provider", return_value="hf"),
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        cmd_models(make_message(text="/models"))
+        sent = mock_bot.send_message.call_args[0][1]
+        # both models are listed, each with its description
+        assert "gpt-oss-120b" in sent
+        assert "ArmGPT" in sent
+        assert "Armenian" in sent
+        # only the active model (hf/ArmGPT) is marked active
+        arm_line = next(line for line in sent.splitlines() if "ArmGPT" in line)
+        main_line = next(line for line in sent.splitlines() if "gpt-oss-120b" in line)
+        assert "active" in arm_line
+        assert "active" not in main_line
+
+
+def test_cmd_models_single_model_no_switch_hint():
+    from bot.handlers import cmd_models
+
+    with (
+        patch("bot.handlers.HF_SPACE_ID", ""),
+        patch("bot.handlers.MODEL", "gpt-oss-120b"),
+        patch("bot.handlers.get_provider", return_value="main"),
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        cmd_models(make_message(text="/models"))
+        sent = mock_bot.send_message.call_args[0][1]
+        main_line = next(line for line in sent.splitlines() if "gpt-oss-120b" in line)
+        assert "active" in main_line
+        assert "Switch with" not in sent
 
 
 def test_handle_message_uses_keep_typing():
