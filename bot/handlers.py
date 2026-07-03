@@ -54,8 +54,6 @@ COMMANDS = [
     ("help", "show this message"),
     ("reset", "clear conversation history"),
     ("about", "about this bot"),
-    ("model", "show or switch the AI model"),
-    ("models", "list available AI models"),
     ("joke", "tell a programming joke"),
     ("quote", "tell a coding quote"),
     ("fact", "tell a coding fact"),
@@ -77,68 +75,13 @@ COMMANDS = [
 ]
 
 
-def available_models():
-    """Registry of selectable AI models — the single source of truth for
-    /model and /models.
-
-    "main" (the OpenAI-compatible provider, e.g. Cerebras) is always
-    present; "hf" (ArmGPT) is offered only when HF_SPACE_ID is configured.
-    Each entry maps a provider `key` (see bot.preferences) to a display
-    `name` and a short `description`. Add a model here to surface it in
-    both commands at once.
-    """
-    models = [
-        {
-            "key": "main",
-            "name": MODEL,
-            "description": "Fast, multilingual, remembers your conversation",
-        }
-    ]
-    if HF_SPACE_ID:
-        models.append(
-            {
-                "key": "hf",
-                "name": "ArmGPT",
-                "description": "Armenian-only base model — slow, no memory",
-            }
-        )
-    return models
-
-
-def active_model(user_id):
-    """Return the registry entry for the user's currently selected model.
-
-    Falls back to the first available model if the saved provider is not
-    in the registry (e.g. a stale "hf" preference after HF was unset)."""
-    provider = get_provider(user_id)
-    models = available_models()
-    for model in models:
-        if model["key"] == provider:
-            return model
-    return models[0]
-
-
-def _resolve_model(choice, models=None):
-    """Map a user-typed value to a registry entry, or None if no match.
-
-    Matching is case-insensitive and accepts either the provider key
-    ("main"/"hf") or the display name ("ArmGPT", "gpt-oss-120b"), so
-    both `/model hf` and `/model armgpt` select the same model."""
-    if models is None:
-        models = available_models()
-    choice = choice.strip().lower()
-    for model in models:
-        if choice in (model["key"].lower(), model["name"].lower()):
-            return model
-    return None
-
-
 def command_menu():
-    """(command, description) pairs for /help and the Telegram "/" menu.
-
-    Kept as a function (rather than exposing COMMANDS directly) so callers
-    have a stable seam if the menu ever needs to become conditional again."""
-    return list(COMMANDS)
+    """Full (command, description) list including the conditional /model
+    command. Shared by /help and the Telegram command-menu registration."""
+    cmds = list(COMMANDS)
+    if HF_SPACE_ID:
+        cmds.append(("model", "switch AI provider"))
+    return cmds
 
 
 @bot.message_handler(commands=["start"], func=is_allowed)
@@ -422,60 +365,42 @@ def cmd_about(message):
     bot.send_message(message.chat.id, "\n".join(lines))
 
 
-@bot.message_handler(commands=["model"], func=is_allowed)
-def cmd_model(message):
-    """Show the active AI model, or switch with `/model <name>`.
+if HF_SPACE_ID:
 
-    With no argument it reports the current model. With an argument it
-    switches, accepting either the provider key or the display name."""
-    parts = (message.text or "").split(maxsplit=1)
-    models = available_models()
-    if len(parts) == 1 or not parts[1].strip():
-        current = active_model(message.from_user.id)
-        text = f"Current model: {current['name']}"
-        if len(models) > 1:
-            text += "\n\nUse /models to list all, or /model <name> to switch."
-        bot.send_message(message.chat.id, text)
-        return
-    choice = parts[1].strip()
-    target = _resolve_model(choice, models)
-    if target is None:
-        bot.send_message(
-            message.chat.id,
-            f"Unknown model: {choice}. Use /models to see what's available.",
-        )
-        return
-    if not set_provider(message.from_user.id, target["key"]):
-        bot.send_message(message.chat.id, "Could not save preference. Try again later.")
-        return
-    if target["key"] == "hf":
-        bot.send_message(
-            message.chat.id,
-            "Switched to ArmGPT (hf).\n\n"
-            "Note: this is a tiny base completion model trained only on Armenian text. "
-            "It will continue whatever you write rather than answer questions, "
-            "and it does not understand English. Replies take ~30-60s and there is no memory.",
-        )
-    else:
-        bot.send_message(
-            message.chat.id, f"Switched to the Main model ({target['name']})."
-        )
-
-
-@bot.message_handler(commands=["models"], func=is_allowed)
-def cmd_models(message):
-    """List every available AI model with its description and active status."""
-    models = available_models()
-    current = active_model(message.from_user.id)
-    lines = ["Available models:"]
-    for model in models:
-        marker = " — active" if model["key"] == current["key"] else ""
-        lines.append(f"• {model['name']}{marker}")
-        lines.append(f"   {model['description']}")
-    if len(models) > 1:
-        lines.append("")
-        lines.append("Switch with /model <name>.")
-    bot.send_message(message.chat.id, "\n".join(lines))
+    @bot.message_handler(commands=["model"], func=is_allowed)
+    def cmd_model(message):
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) == 1:
+            current = get_provider(message.from_user.id)
+            bot.send_message(
+                message.chat.id,
+                f"Current provider: {current}\n\n"
+                "Options:\n"
+                "/model main — Cerebras (fast, multilingual, with memory)\n"
+                "/model hf — ArmGPT (Armenian only, slow, no memory)",
+            )
+            return
+        choice = parts[1].strip().lower()
+        if choice not in ("main", "hf"):
+            bot.send_message(
+                message.chat.id, "Invalid choice. Use: /model main or /model hf"
+            )
+            return
+        if not set_provider(message.from_user.id, choice):
+            bot.send_message(
+                message.chat.id, "Could not save preference. Try again later."
+            )
+            return
+        if choice == "hf":
+            bot.send_message(
+                message.chat.id,
+                "Switched to hf (ArmGPT).\n\n"
+                "Note: this is a tiny base completion model trained only on Armenian text. "
+                "It will continue whatever you write rather than answer questions, "
+                "and it does not understand English. Replies take ~30-60s and there is no memory.",
+            )
+        else:
+            bot.send_message(message.chat.id, "Switched to Main Provider.")
 
 
 @bot.message_handler(content_types=["text"], func=is_allowed)
