@@ -54,6 +54,7 @@ COMMANDS = [
     ("help", "show this message"),
     ("reset", "clear conversation history"),
     ("about", "about this bot"),
+    ("sha", "show the live git commit SHA"),
     ("model", "show or switch the AI model"),
     ("models", "list available AI models"),
     ("joke", "tell a programming joke"),
@@ -420,6 +421,12 @@ def cmd_about(message):
     if COMMIT_SHA:
         lines.append(f"Version: {COMMIT_SHA}")
     bot.send_message(message.chat.id, "\n".join(lines))
+
+
+@bot.message_handler(commands=["sha"], func=is_allowed)
+def cmd_sha(message):
+    sha = COMMIT_SHA or "unknown"
+    bot.send_message(message.chat.id, f"Live SHA: {sha}")
 
 
 @bot.message_handler(commands=["model"], func=is_allowed)
