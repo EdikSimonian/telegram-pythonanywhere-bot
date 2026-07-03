@@ -37,41 +37,47 @@ def _log(message, direction: str, text: str) -> None:
 # ----------------------------
 
 COMMANDS = [
-    ("start", "welcome"),
-    ("help", "list commands"),
-    ("reset", "clear chat"),
-    ("about", "bot info"),
-    ("sha", "version"),
+    ("start", "Start the bot and see the welcome message"),
 
-    ("model", "switch model"),
-    ("models", "list models"),
+    ("help", "Show all available commands with detailed explanations"),
 
-    ("joke", "joke"),
-    ("quote", "quote"),
-    ("fact", "fact"),
-    ("compliment", "compliment"),
+    ("reset", "Clear your chat history and start a fresh conversation"),
 
-    ("explain", "explain topic"),
-    ("challenge", "coding challenge"),
-    ("analogy", "analogy"),
-    ("motivate", "motivation"),
-    ("translate", "translate code"),
-    ("debug", "debug code"),
-    ("review", "review code"),
-    ("quiz", "quiz"),
-    ("summarize", "summarize"),
+    ("about", "Show bot information including model, version, and system status"),
 
-    ("convert", "convert files"),
-    ("roadmap", "learning path"),
-    ("streak", "streak tracker"),
-    ("interview", "mock interview"),
-    ("run", "simulate code"),
+    ("sha", "Display the current deployed git commit version (debugging info)"),
 
-    ("roll", "dice"),
-    ("roast", "roast"),
-    ("remember", "save note"),
-    ("recall", "show notes"),
-    ("forget", "delete notes"),
+    ("model", "View or switch the AI model used for your responses"),
+    ("models", "List all available AI models and their capabilities"),
+
+    ("joke", "Get a short, clean programming or tech-related joke"),
+    ("quote", "Receive a meaningful quote about programming or software engineering"),
+    ("fact", "Learn a surprising and interesting fact about computing or technology"),
+    ("compliment", "Get a personalized and encouraging compliment"),
+
+    ("explain", "Explain a programming concept in a simple, beginner-friendly way"),
+    ("challenge", "Receive a small coding challenge to practice problem-solving skills"),
+    ("analogy", "Understand a technical concept through a real-world analogy"),
+    ("motivate", "Get motivational encouragement for learning programming"),
+    ("translate", "Translate code from one programming language to another"),
+    ("debug", "Find and explain bugs in your code with a corrected version"),
+    ("review", "Get a constructive code review with improvement suggestions"),
+    ("quiz", "Take a short programming quiz and receive instant feedback"),
+    ("summarize", "Summarize long text into key points or concise explanation"),
+
+    ("convert", "Convert files between formats (text, JSON, CSV, images where supported)"),
+
+    ("roadmap", "Generate a structured learning path from beginner to advanced level"),
+    ("streak", "Track your daily learning streak and progress consistency"),
+    ("interview", "Simulate a real technical interview with questions and evaluation"),
+    ("run", "Simulate code execution and predict its output step by step"),
+
+    ("roll", "Roll a virtual dice (1–6) for random decision making"),
+    ("roast", "Get a humorous, light roast based on a given name"),
+
+    ("remember", "Save a personal note or important information"),
+    ("recall", "Retrieve all previously saved notes"),
+    ("forget", "Delete all saved notes permanently"),
 ]
 
 
