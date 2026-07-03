@@ -146,8 +146,11 @@ def command_menu():
 
 @bot.message_handler(commands=["start"], func=is_allowed)
 def cmd_start(message):
-    bot.send_message(message.chat.id, "AI coding assistant ready. Use /help")
-
+    bot.send_message(
+        message.chat.id,
+        "Hi! I'm your AI coding assistant.\n\n"
+        "Use /help to see what I can do."
+    )
 
 @bot.message_handler(commands=["help"], func=is_allowed)
 def cmd_help(message):
