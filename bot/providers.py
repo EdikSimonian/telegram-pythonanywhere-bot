@@ -19,15 +19,34 @@ HF_TEMPERATURE = 0.6
 HF_TOP_K = 30
 
 
-def _call_main(messages: list, retries: int = AI_RETRIES):   # ← no `model` param
-    
- model=MODEL,                                          # ← always the default
+def _call_main(messages: list, retries: int = AI_RETRIES):
+    """Call the OpenAI-compatible API with bounded retries.
 
-def generate(user_id: int, messages: list) -> str:
-    provider = get_provider(user_id)
-    if provider == "hf":
-        return _call_hf(messages)
-    return _call_main(messages)                               # ← ignores the selected model
+    Each attempt is capped by AI_REQUEST_TIMEOUT and the per-attempt timeout
+    is dynamically reduced if the wall-clock budget is shrinking, so total
+    elapsed time stays under Telegram's ~60s webhook window even on the worst path.
+    """
+    deadline = time.monotonic() + AI_REQUEST_TIMEOUT * retries + retries
+    for attempt in range(retries):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("AI provider deadline exceeded")
+        timeout = min(AI_REQUEST_TIMEOUT, remaining)
+        try:
+            response = ai.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                timeout=timeout,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            if attempt == retries - 1:
+                raise
+            wait = min(2**attempt, max(0, deadline - time.monotonic()))
+            print(
+                f"AI call failed (attempt {attempt + 1}/{retries}): {e} — retrying in {wait}s"
+            )
+            time.sleep(wait)
 
 
 def _last_user_message(messages: list) -> str:
@@ -81,3 +100,9 @@ def _call_hf(messages: list) -> str:
     return text or "(empty response from ArmGPT)"
 
 
+def generate(user_id: int, messages: list) -> str:
+    """Dispatch to the user's chosen AI provider and return a reply string."""
+    provider = get_provider(user_id)
+    if provider == "hf":
+        return _call_hf(messages)
+    return _call_main(messages)

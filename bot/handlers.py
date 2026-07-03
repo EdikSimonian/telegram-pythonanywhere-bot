@@ -2,7 +2,6 @@ import json
 import os
 import random
 from datetime import datetime
-
 from bot.clients import bot, BOT_INFO, store
 from bot.config import COMMIT_SHA, HF_SPACE_ID, HOSTING_LABEL, MODEL, RATE_LIMIT
 from bot.ai import ask_ai
@@ -45,66 +44,55 @@ def _log(message, direction: str, text: str) -> None:
     print(f"[{ts}] {sender} → {receiver}: {snippet}", flush=True)
 
 
+
 # Single source of truth for the bot's command list. Drives both /help
 # and the Telegram "/" autocomplete menu (registered via set_my_commands
 # in bot.clients.register_commands). Add a new command here when you add
 # its handler, or it won't show up in the menu.
 COMMANDS = [
-    ("start", "start the bot & see the welcome message"),
-    ("help", "show all available commands"),
-    ("reset", "clear your chat history"),
-    ("about", "bot info: model, version, status"),
-    ("sha", "show the live git commit SHA"),
-    ("model", "view or switch the AI model"),
+    ("start", "welcome message"),
+    ("help", "show this message"),
+    ("reset", "clear conversation history"),
+    ("about", "about this bot"),
+    ("model", "show or switch the AI model"),
     ("models", "list available AI models"),
-    ("joke", "get a programming joke"),
-    ("quote", "get a programming quote"),
-    ("fact", "get a surprising tech fact"),
-    ("compliment", "get an encouraging compliment"),
-    ("explain", "explain a coding topic simply"),
-    ("challenge", "get a small coding challenge"),
+    ("joke", "tell a programming joke"),
+    ("quote", "tell a coding quote"),
+    ("fact", "tell a coding fact"),
+    ("compliment", "give a compliment"),
+    ("explain", "explain a coding topic"),
+    ("challenge", "get a coding challenge"),
     ("analogy", "explain a concept by analogy"),
     ("motivate", "get a motivational boost"),
     ("translate", "translate code to another language"),
-    ("debug", "find & fix the bug in your code"),
+    ("debug", "find the bug in your code"),
     ("review", "get a short code review"),
     ("quiz", "take a quick quiz on a topic"),
     ("summarize", "summarize a block of text"),
-    ("convert", "convert text/data between formats"),
-    ("roadmap", "get a beginner→advanced learning path"),
-    ("streak", "track your daily learning streak"),
-    ("interview", "practice a mock technical interview"),
-    ("run", "predict code output step by step"),
-    ("roll", "roll the dice (1-6)"),
-    ("roast", "get a light roast of a name"),
-    ("remember", "save a personal note"),
-    ("recall", "list your saved notes"),
-    ("forget", "delete all your notes"),
+    ("roll", "roll the dice"),
+    ("roast", "get roasted"),
+    ("remember", "save a note"),
+    ("recall", "list your notes"),
+    ("forget", "clear your notes"),
 ]
 
 
 def available_models():
     """Registry of selectable AI models — the single source of truth for
-    /model and /models (and provider validation in bot.preferences).
+    /model and /models.
 
-    "main" (the default Cerebras model from AI_MODEL) and the alternate
-    Cerebras ID `qwen-3-235b-a22b-instruct-2507` are always present; "hf"
-    (ArmGPT) is offered only when HF_SPACE_ID is configured. Each entry
-    maps a provider `key` (see bot.preferences / bot.providers) to a
-    display `name` and a short `description`. Add a model here to surface
-    it in both commands at once.
+    "main" (the OpenAI-compatible provider, e.g. Cerebras) is always
+    present; "hf" (ArmGPT) is offered only when HF_SPACE_ID is configured.
+    Each entry maps a provider `key` (see bot.preferences) to a display
+    `name` and a short `description`. Add a model here to surface it in
+    both commands at once.
     """
     models = [
         {
             "key": "main",
             "name": MODEL,
             "description": "Fast, multilingual, remembers your conversation",
-        },
-        {
-            "key": "qwen-3-235b-a22b-instruct-2507",
-            "name": "qwen-3-235b-a22b-instruct-2507",
-            "description": "Strong reasoning & multilingual — slower, more queue-pressured",
-        },
+        }
     ]
     if HF_SPACE_ID:
         models.append(
@@ -138,7 +126,7 @@ def _resolve_model(choice, models=None):
     both `/model hf` and `/model armgpt` select the same model."""
     if models is None:
         models = available_models()
-    choice = (choice or "").strip().lower()
+    choice = choice.strip().lower()
     for model in models:
         if choice in (model["key"].lower(), model["name"].lower()):
             return model
@@ -153,35 +141,260 @@ def command_menu():
     return list(COMMANDS)
 
 
-def _arg(message):
-    """Return the text after the command, or "" when nothing was supplied.
-
-    `/explain recursion` → "recursion"; a bare `/explain` → "". Handlers
-    that need to parse sub-arguments (e.g. /translate <lang> <code>) split
-    message.text themselves."""
-    parts = (message.text or "").split(maxsplit=1)
-    return parts[1].strip() if len(parts) > 1 else ""
-
-
-# ----------------------------
-# BASIC COMMANDS
-# ----------------------------
-
-
 @bot.message_handler(commands=["start"], func=is_allowed)
 def cmd_start(message):
     bot.send_message(
         message.chat.id,
-        "👋 Hi! I'm your AI coding assistant.\n\n"
-        "Ask me anything about programming, or try a command. "
-        "Not sure where to start? Send /help to see everything I can do.",
+        "Hello! I'm your AI coding assistant. If you don't know what to ask, try /help for a list of commands.",
     )
+@bot.message_handler(commands=["joke"], func=is_allowed)
+def cmd_joke(message):
+ reply = ask_ai(
+  message.from_user.id,
+  "Tell me one original, clean programming or tech joke. "
+  "Keep it short (1-2 lines) and make sure it actually lands with a clever punchline. "
+  "Reply with only the joke — no preamble, no explanation.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["quote"], func=is_allowed)
+def cmd_quote(message):
+ reply = ask_ai(
+  message.from_user.id,
+  "Share one memorable quote about programming, software, or technology. "
+  "Attribute it to the real author if known. "
+  "Format it as:\n\"<quote>\"\n— <author>\n"
+  "Reply with only the quote — no preamble, no explanation.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["fact"], func=is_allowed)
+def cmd_fact(message):
+ reply = ask_ai(
+  message.from_user.id,
+  "Share one genuinely surprising, true fact about computing, programming, or tech history. "
+  "Keep it to 1-3 sentences and make it something most people wouldn't already know. "
+  "Reply with only the fact — no preamble, no explanation.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["compliment"], func=is_allowed)
+def cmd_compliment(message):
+ reply = ask_ai(
+  message.from_user.id,
+  "Give me one warm, genuine, and original compliment. "
+  "Make it uplifting and specific rather than generic flattery, and keep it to 1-2 sentences. "
+  "Reply with only the compliment — no preamble, no explanation.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["explain"], func=is_allowed)
+def cmd_explain(message):
+ topic = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not topic:
+  bot.send_message(message.chat.id, "Usage: /explain <topic>  (e.g. /explain recursion)")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  f"Explain this coding topic clearly and simply for a beginner: {topic}. "
+  "Use plain language, keep it concise, and include one short example if it helps. "
+  "Reply with only the explanation — no preamble.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["challenge"], func=is_allowed)
+def cmd_challenge(message):
+ reply = ask_ai(
+  message.from_user.id,
+  "Give me one small, self-contained programming challenge suitable for a student. "
+  "State the task clearly with an example input and expected output. "
+  "Keep it beginner-friendly and solvable in a few lines of code. "
+  "Do NOT include the solution. Reply with only the challenge — no preamble.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["analogy"], func=is_allowed)
+def cmd_analogy(message):
+ concept = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not concept:
+  bot.send_message(message.chat.id, "Usage: /analogy <concept>  (e.g. /analogy pointers)")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  f"Explain this coding concept using one clear, relatable real-world analogy: {concept}. "
+  "Keep it short and make the analogy do the work. Reply with only the analogy — no preamble.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["motivate"], func=is_allowed)
+def cmd_motivate(message):
+ reply = ask_ai(
+  message.from_user.id,
+  "Give me one short, genuine, and uplifting motivational message for a student "
+  "who is learning to code and might feel stuck or frustrated. "
+  "Keep it warm and encouraging, 1-2 sentences. Reply with only the message — no preamble.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["translate"], func=is_allowed)
+def cmd_translate(message):
+ parts = (message.text or "").split(maxsplit=2)
+ if len(parts) < 3 or not parts[2].strip():
+  bot.send_message(
+   message.chat.id,
+   "Usage: /translate <language> <code>\n"
+   "Example: /translate javascript print('hi')",
+  )
+  return
+ lang = parts[1].strip()
+ code = parts[2].strip()
+ reply = ask_ai(
+  message.from_user.id,
+  f"Translate the following code into {lang}. "
+  "Keep the same behavior and logic. Reply with only the translated code in a code block, "
+  f"followed by one short sentence noting anything that changed.\n\nCode:\n{code}",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["debug"], func=is_allowed)
+def cmd_debug(message):
+ code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not code:
+  bot.send_message(message.chat.id, "Usage: /debug <code>\nPaste the code that isn't working.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  "Find the bug in the following code. Explain what's wrong in 1-2 sentences, "
+  "then show the corrected code in a code block. If there is no bug, say so. "
+  f"Keep it concise. Reply with only the answer — no preamble.\n\nCode:\n{code}",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["review"], func=is_allowed)
+def cmd_review(message):
+ code = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not code:
+  bot.send_message(message.chat.id, "Usage: /review <code>\nPaste the code you'd like reviewed.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  "Give a short, constructive code review of the following code. "
+  "Point out any bugs, style issues, and one concrete improvement. "
+  "Be encouraging and keep it concise. "
+  f"Reply with only the review — no preamble.\n\nCode:\n{code}",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["quiz"], func=is_allowed)
+def cmd_quiz(message):
+ topic = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not topic:
+  bot.send_message(message.chat.id, "Usage: /quiz <topic>  (e.g. /quiz python lists)")
+  return
+ question = ask_ai(
+  message.from_user.id,
+  f"Create one short quiz question about: {topic}. "
+  "Ask a single clear question that has a definite correct answer. "
+  "Do NOT reveal or hint at the answer. Reply with only the question — no preamble.",
+ )
+ sent = bot.send_message(message.chat.id, f"❓ {question}\n\nReply with your answer.")
+ bot.register_next_step_handler(sent, _grade_quiz, question)
+def _grade_quiz(message, question):
+ answer = (message.text or "").strip()
+ if not answer:
+  bot.send_message(message.chat.id, "No answer given — quiz cancelled.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  f"Quiz question: {question}\n"
+  f"Student's answer: {answer}\n\n"
+  "Say whether the answer is correct, then give the correct answer with a one-sentence "
+  "explanation. Be encouraging and concise.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["summarize"], func=is_allowed)
+def cmd_summarize(message):
+ text = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not text:
+  bot.send_message(message.chat.id, "Usage: /summarize <text>\nPaste the text you'd like summarized.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  "Summarize the following text concisely, capturing the key points as a short "
+  "paragraph or a few bullet points. Do not add opinions or information that isn't "
+  f"in the text. Reply with only the summary — no preamble.\n\nText:\n{text}",
+ )
+ bot.send_message(message.chat.id, reply)
+
+@bot.message_handler(commands=["roll"], func=is_allowed)
+def cmd_roll(message):
+ result = random.randint(1, 6)
+ bot.send_message(message.chat.id, f"🎲 You rolled a {result}!")
+
+@bot.message_handler(commands=["roast"], func=is_allowed)
+def cmd_roast(message):
+ sent = bot.send_message(message.chat.id, "Who should I roast? Send me a name.")
+ bot.register_next_step_handler(sent, _do_roast)
+def _do_roast(message):
+ name = (message.text or "").strip()
+ if not name:
+  bot.send_message(message.chat.id, "No name given — roast cancelled.")
+  return
+ reply = ask_ai(
+  message.from_user.id,
+  f"Write a short, brutal, savage roast of {name}. "
+  "Go hard — be sharp, witty, and merciless. Don't hold back or soften it, "
+  "but keep it clever comedy (no slurs, no protected-class attacks, nothing genuinely hateful). "
+  "Keep it to 1-3 punchy lines. Reply with only the roast — no preamble, no disclaimers.",
+ )
+ bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["remember"], func=is_allowed)
+def cmd_remember(message):
+ if store is None:
+  bot.send_message(message.chat.id, "Notes need storage, which isn't set up right now.")
+  return
+ note = message.text.split(maxsplit=1)[1].strip() if " " in message.text else ""
+ if not note:
+  bot.send_message(message.chat.id, "Usage: /remember <something to note>")
+  return
+ key = f"notes:{message.from_user.id}"
+ raw = store.get(key)
+ notes = json.loads(raw) if raw else []  # strings only — decode the list on the way out
+ notes.append(note)  # append, don't replace
+ store.set(key, json.dumps(notes))  # encode the list on the way in
+ bot.send_message(message.chat.id, f"Saved! You now have {len(notes)} note(s).")
+
+
+@bot.message_handler(commands=["recall"], func=is_allowed)
+def cmd_recall(message):
+ if store is None:
+  bot.send_message(message.chat.id, "Notes need storage, which isn't set up right now.")
+  return
+ raw = store.get(f"notes:{message.from_user.id}")
+ notes = json.loads(raw) if raw else []
+ if not notes:
+  bot.send_message(message.chat.id, "You have no saved notes. Add one with /remember <text>")
+  return
+ lines = [f"{i}. {note}" for i, note in enumerate(notes, start=1)]
+ bot.send_message(message.chat.id, "Your notes:\n" + "\n".join(lines))
+
+
+@bot.message_handler(commands=["forget"], func=is_allowed)
+def cmd_forget(message):
+ if store is None:
+  bot.send_message(message.chat.id, "Notes need storage, which isn't set up right now.")
+  return
+ store.delete(f"notes:{message.from_user.id}")
+ bot.send_message(message.chat.id, "All your notes have been cleared.")
 
 
 @bot.message_handler(commands=["help"], func=is_allowed)
 def cmd_help(message):
-    lines = ["Here's everything I can do:", ""]
-    lines += [f"/{name} — {desc}" for name, desc in command_menu()]
+    lines = [f"/{name} — {desc}" for name, desc in command_menu()]
     bot.send_message(message.chat.id, "\n".join(lines))
 
 
@@ -193,27 +406,20 @@ def cmd_reset(message):
 
 @bot.message_handler(commands=["about"], func=is_allowed)
 def cmd_about(message):
-    model = active_model(message.from_user.id)
+    if HF_SPACE_ID:
+        provider = get_provider(message.from_user.id)
+        model_line = f"{MODEL} (main)" if provider == "main" else f"{HF_SPACE_ID} (hf)"
+    else:
+        model_line = MODEL
     storage_line = "SQLite" if store is not None else "stateless (no memory)"
     lines = [
-        f"Model  : {model['name']}",
+        f"Model  : {model_line}",
         f"Storage: {storage_line}",
         f"Hosting: {HOSTING_LABEL}",
     ]
     if COMMIT_SHA:
         lines.append(f"Version: {COMMIT_SHA}")
     bot.send_message(message.chat.id, "\n".join(lines))
-
-
-@bot.message_handler(commands=["sha"], func=is_allowed)
-def cmd_sha(message):
-    sha = COMMIT_SHA or "unknown"
-    bot.send_message(message.chat.id, f"Live SHA: {sha}")
-
-
-# ----------------------------
-# MODEL SWITCH
-# ----------------------------
 
 
 @bot.message_handler(commands=["model"], func=is_allowed)
@@ -272,480 +478,6 @@ def cmd_models(message):
     bot.send_message(message.chat.id, "\n".join(lines))
 
 
-# ----------------------------
-# QUICK AI COMMANDS
-# ----------------------------
-
-
-@bot.message_handler(commands=["joke"], func=is_allowed)
-def cmd_joke(message):
-    reply = ask_ai(
-        message.from_user.id,
-        "Tell me one original, clean programming or tech joke. "
-        "Keep it short (1-2 lines) and make sure it actually lands with a clever punchline. "
-        "Reply with only the joke — no preamble, no explanation.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["quote"], func=is_allowed)
-def cmd_quote(message):
-    reply = ask_ai(
-        message.from_user.id,
-        "Share one memorable quote about programming, software, or technology. "
-        "Attribute it to the real author if known. "
-        'Format it as:\n"<quote>"\n— <author>\n'
-        "Reply with only the quote — no preamble, no explanation.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["fact"], func=is_allowed)
-def cmd_fact(message):
-    reply = ask_ai(
-        message.from_user.id,
-        "Share one genuinely surprising, true fact about computing, programming, or tech history. "
-        "Keep it to 1-3 sentences and make it something most people wouldn't already know. "
-        "Reply with only the fact — no preamble, no explanation.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["compliment"], func=is_allowed)
-def cmd_compliment(message):
-    reply = ask_ai(
-        message.from_user.id,
-        "Give me one warm, genuine, and original compliment. "
-        "Make it uplifting and specific rather than generic flattery, and keep it to 1-2 sentences. "
-        "Reply with only the compliment — no preamble, no explanation.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["motivate"], func=is_allowed)
-def cmd_motivate(message):
-    reply = ask_ai(
-        message.from_user.id,
-        "Give me one short, genuine, and uplifting motivational message for a student "
-        "who is learning to code and might feel stuck or frustrated. "
-        "Keep it warm and encouraging, 1-2 sentences. Reply with only the message — no preamble.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-# ----------------------------
-# LEARNING
-# ----------------------------
-
-
-@bot.message_handler(commands=["explain"], func=is_allowed)
-def cmd_explain(message):
-    topic = _arg(message)
-    if not topic:
-        bot.send_message(
-            message.chat.id, "Usage: /explain <topic>  (e.g. /explain recursion)"
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        f"Explain this coding topic clearly and simply for a beginner: {topic}. "
-        "Use plain language, keep it concise, and include one short example if it helps. "
-        "Reply with only the explanation — no preamble.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["challenge"], func=is_allowed)
-def cmd_challenge(message):
-    reply = ask_ai(
-        message.from_user.id,
-        "Give me one small, self-contained programming challenge suitable for a student. "
-        "State the task clearly with an example input and expected output. "
-        "Keep it beginner-friendly and solvable in a few lines of code. "
-        "Do NOT include the solution. Reply with only the challenge — no preamble.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["analogy"], func=is_allowed)
-def cmd_analogy(message):
-    concept = _arg(message)
-    if not concept:
-        bot.send_message(
-            message.chat.id, "Usage: /analogy <concept>  (e.g. /analogy pointers)"
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        f"Explain this coding concept using one clear, relatable real-world analogy: {concept}. "
-        "Keep it short and make the analogy do the work. Reply with only the analogy — no preamble.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["translate"], func=is_allowed)
-def cmd_translate(message):
-    parts = (message.text or "").split(maxsplit=2)
-    if len(parts) < 3 or not parts[2].strip():
-        bot.send_message(
-            message.chat.id,
-            "Usage: /translate <language> <code>\n"
-            "Example: /translate javascript print('hi')",
-        )
-        return
-    lang = parts[1].strip()
-    code = parts[2].strip()
-    reply = ask_ai(
-        message.from_user.id,
-        f"Translate the following code into {lang}. "
-        "Keep the same behavior and logic. Reply with only the translated code in a code block, "
-        f"followed by one short sentence noting anything that changed.\n\nCode:\n{code}",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["debug"], func=is_allowed)
-def cmd_debug(message):
-    code = _arg(message)
-    if not code:
-        bot.send_message(
-            message.chat.id, "Usage: /debug <code>\nPaste the code that isn't working."
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        "Find the bug in the following code. Explain what's wrong in 1-2 sentences, "
-        "then show the corrected code in a code block. If there is no bug, say so. "
-        f"Keep it concise. Reply with only the answer — no preamble.\n\nCode:\n{code}",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["review"], func=is_allowed)
-def cmd_review(message):
-    code = _arg(message)
-    if not code:
-        bot.send_message(
-            message.chat.id, "Usage: /review <code>\nPaste the code you'd like reviewed."
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        "Give a short, constructive code review of the following code. "
-        "Point out any bugs, style issues, and one concrete improvement. "
-        "Be encouraging and keep it concise. "
-        f"Reply with only the review — no preamble.\n\nCode:\n{code}",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["quiz"], func=is_allowed)
-def cmd_quiz(message):
-    topic = _arg(message)
-    if not topic:
-        bot.send_message(
-            message.chat.id, "Usage: /quiz <topic>  (e.g. /quiz python lists)"
-        )
-        return
-    question = ask_ai(
-        message.from_user.id,
-        f"Create one short quiz question about: {topic}. "
-        "Ask a single clear question that has a definite correct answer. "
-        "Do NOT reveal or hint at the answer. Reply with only the question — no preamble.",
-    )
-    sent = bot.send_message(message.chat.id, f"❓ {question}\n\nReply with your answer.")
-    bot.register_next_step_handler(sent, _grade_quiz, question)
-
-
-def _grade_quiz(message, question):
-    answer = (message.text or "").strip()
-    if not answer:
-        bot.send_message(message.chat.id, "No answer given — quiz cancelled.")
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        f"Quiz question: {question}\n"
-        f"Student's answer: {answer}\n\n"
-        "Say whether the answer is correct, then give the correct answer with a one-sentence "
-        "explanation. Be encouraging and concise.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["summarize"], func=is_allowed)
-def cmd_summarize(message):
-    text = _arg(message)
-    if not text:
-        bot.send_message(
-            message.chat.id,
-            "Usage: /summarize <text>\nPaste the text you'd like summarized.",
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        "Summarize the following text concisely, capturing the key points as a short "
-        "paragraph or a few bullet points. Do not add opinions or information that isn't "
-        f"in the text. Reply with only the summary — no preamble.\n\nText:\n{text}",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["convert"], func=is_allowed)
-def cmd_convert(message):
-    """Convert text/data between formats (JSON, CSV, YAML, plain text, …).
-
-    Usage: /convert <target-format> <data>. Binary formats like images
-    aren't supported over a text chat — this handles textual data only."""
-    parts = (message.text or "").split(maxsplit=2)
-    if len(parts) < 3 or not parts[2].strip():
-        bot.send_message(
-            message.chat.id,
-            "Usage: /convert <target-format> <data>\n"
-            'Example: /convert json name: Alice, age: 30\n\n'
-            "Supported: text, JSON, CSV, YAML, XML, Markdown table. "
-            "(Image/binary conversion isn't available over chat.)",
-        )
-        return
-    target = parts[1].strip()
-    data = parts[2].strip()
-    reply = ask_ai(
-        message.from_user.id,
-        f"Convert the following data into {target} format. "
-        "Preserve all the information. If the input is ambiguous, make a reasonable "
-        "assumption and note it in one short line. Reply with only the converted result "
-        f"in a code block — no preamble.\n\nData:\n{data}",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["roadmap"], func=is_allowed)
-def cmd_roadmap(message):
-    topic = _arg(message)
-    if not topic:
-        bot.send_message(
-            message.chat.id,
-            "Usage: /roadmap <topic>  (e.g. /roadmap web development)",
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        f"Create a structured learning roadmap for: {topic}. "
-        "Organize it into clear stages from Beginner to Intermediate to Advanced. "
-        "Under each stage list a few concrete topics or skills to learn, in order. "
-        "Keep it practical and concise. Reply with only the roadmap — no preamble.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["streak"], func=is_allowed)
-def cmd_streak(message):
-    """Track a per-user daily learning streak.
-
-    Increments once per calendar day: a check-in on a consecutive day
-    grows the streak, a gap resets it to 1, and a repeat check-in on the
-    same day is a no-op. State is a small JSON blob under streak:{id}."""
-    if store is None:
-        bot.send_message(
-            message.chat.id, "Streak tracking needs storage, which isn't set up right now."
-        )
-        return
-    key = f"streak:{message.from_user.id}"
-    today = datetime.now().date()
-    try:
-        raw = store.get(key)
-        data = json.loads(raw) if raw else {}
-    except Exception:
-        data = {}
-    count = int(data.get("count", 0) or 0)
-    last_date = None
-    last = data.get("last")
-    if last:
-        try:
-            last_date = datetime.strptime(last, "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            last_date = None
-
-    if last_date == today:
-        bot.send_message(
-            message.chat.id,
-            f"🔥 You're on a {count}-day streak. Already checked in today — see you tomorrow!",
-        )
-        return
-
-    if last_date is not None and (today - last_date).days == 1:
-        count += 1
-    else:
-        count = 1
-
-    try:
-        store.set(key, json.dumps({"last": today.isoformat(), "count": count}))
-    except Exception as e:
-        print(f"Store write error (streak): {e}")
-
-    if count == 1:
-        bot.send_message(
-            message.chat.id,
-            "🔥 Streak started — Day 1! Come back tomorrow to keep it alive.",
-        )
-    else:
-        bot.send_message(
-            message.chat.id, f"🔥 Nice! You're on a {count}-day learning streak. Keep it up!"
-        )
-
-
-@bot.message_handler(commands=["interview"], func=is_allowed)
-def cmd_interview(message):
-    """Ask one mock technical-interview question, then evaluate the reply.
-
-    An optional argument focuses the topic (e.g. /interview python)."""
-    topic = _arg(message)
-    focus = f" about {topic}" if topic else ""
-    question = ask_ai(
-        message.from_user.id,
-        f"You are a friendly technical interviewer. Ask me ONE realistic interview question{focus} "
-        "suitable for a junior-to-mid-level developer. Keep it to a single clear question. "
-        "Do NOT include the answer or any hints. Reply with only the question — no preamble.",
-    )
-    sent = bot.send_message(
-        message.chat.id,
-        f"🧑‍💻 Interview question:\n\n{question}\n\nReply with your answer.",
-    )
-    bot.register_next_step_handler(sent, _evaluate_interview, question)
-
-
-def _evaluate_interview(message, question):
-    answer = (message.text or "").strip()
-    if not answer:
-        bot.send_message(message.chat.id, "No answer given — interview cancelled.")
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        f"Interview question: {question}\n"
-        f"Candidate's answer: {answer}\n\n"
-        "As a friendly technical interviewer, evaluate the answer: note what was good, "
-        "what was missing or incorrect, then give a stronger model answer. "
-        "Be constructive and concise.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-@bot.message_handler(commands=["run"], func=is_allowed)
-def cmd_run(message):
-    code = _arg(message)
-    if not code:
-        bot.send_message(
-            message.chat.id,
-            "Usage: /run <code>\nPaste the code and I'll predict its output.",
-        )
-        return
-    reply = ask_ai(
-        message.from_user.id,
-        "Act as a code interpreter. Trace the following code step by step, briefly, "
-        "then show the exact predicted output in a code block labelled Output. "
-        "If it would raise an error, show the error instead. "
-        f"Reply with only the trace and output — no preamble.\n\nCode:\n{code}",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-# ----------------------------
-# FUN
-# ----------------------------
-
-
-@bot.message_handler(commands=["roll"], func=is_allowed)
-def cmd_roll(message):
-    result = random.randint(1, 6)
-    bot.send_message(message.chat.id, f"🎲 You rolled a {result}!")
-
-
-@bot.message_handler(commands=["roast"], func=is_allowed)
-def cmd_roast(message):
-    name = _arg(message)
-    if name:
-        _send_roast(message, name)
-        return
-    sent = bot.send_message(message.chat.id, "Who should I roast? Send me a name.")
-    bot.register_next_step_handler(sent, _do_roast)
-
-
-def _do_roast(message):
-    name = (message.text or "").strip()
-    if not name:
-        bot.send_message(message.chat.id, "No name given — roast cancelled.")
-        return
-    _send_roast(message, name)
-
-
-def _send_roast(message, name):
-    reply = ask_ai(
-        message.from_user.id,
-        f"Write a short, savage-but-playful roast of {name}. "
-        "Be sharp and witty, but keep it clever comedy — no slurs, no attacks on "
-        "protected classes, nothing genuinely hateful. "
-        "Keep it to 1-3 punchy lines. Reply with only the roast — no preamble, no disclaimers.",
-    )
-    bot.send_message(message.chat.id, reply)
-
-
-# ----------------------------
-# NOTES
-# ----------------------------
-
-
-@bot.message_handler(commands=["remember"], func=is_allowed)
-def cmd_remember(message):
-    if store is None:
-        bot.send_message(
-            message.chat.id, "Notes need storage, which isn't set up right now."
-        )
-        return
-    note = _arg(message)
-    if not note:
-        bot.send_message(message.chat.id, "Usage: /remember <something to note>")
-        return
-    key = f"notes:{message.from_user.id}"
-    raw = store.get(key)
-    notes = json.loads(raw) if raw else []  # strings only — decode the list on the way out
-    notes.append(note)  # append, don't replace
-    store.set(key, json.dumps(notes))  # encode the list on the way in
-    bot.send_message(message.chat.id, f"Saved! You now have {len(notes)} note(s).")
-
-
-@bot.message_handler(commands=["recall"], func=is_allowed)
-def cmd_recall(message):
-    if store is None:
-        bot.send_message(
-            message.chat.id, "Notes need storage, which isn't set up right now."
-        )
-        return
-    raw = store.get(f"notes:{message.from_user.id}")
-    notes = json.loads(raw) if raw else []
-    if not notes:
-        bot.send_message(
-            message.chat.id, "You have no saved notes. Add one with /remember <text>"
-        )
-        return
-    lines = [f"{i}. {note}" for i, note in enumerate(notes, start=1)]
-    bot.send_message(message.chat.id, "Your notes:\n" + "\n".join(lines))
-
-
-@bot.message_handler(commands=["forget"], func=is_allowed)
-def cmd_forget(message):
-    if store is None:
-        bot.send_message(
-            message.chat.id, "Notes need storage, which isn't set up right now."
-        )
-        return
-    store.delete(f"notes:{message.from_user.id}")
-    bot.send_message(message.chat.id, "All your notes have been cleared.")
-
-
-# ----------------------------
-# MAIN HANDLER
-# ----------------------------
-
-
 @bot.message_handler(content_types=["text"], func=is_allowed)
 def handle_message(message):
     if not should_respond(message):
@@ -770,3 +502,4 @@ def handle_message(message):
         print(f"Error in handle_message: {e}")
         bot.send_message(message.chat.id, "Something went wrong. Please try again.")
         _log(message, "out", f"[error] {e}")
+        
