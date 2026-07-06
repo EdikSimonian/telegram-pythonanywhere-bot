@@ -3,6 +3,9 @@ from bot.config import DEFAULT_PROVIDER, HF_SPACE_ID
 
 
 def _is_valid_provider(provider: str) -> bool:
+    """Read-time check: is this a provider we can actually serve right now?
+    'hf' is only valid when HF_SPACE_ID is configured, so a stale 'hf'
+    preference falls back to the default on read."""
     if not provider or not provider.strip():
         return False
     if provider == "hf":
@@ -10,6 +13,23 @@ def _is_valid_provider(provider: str) -> bool:
     if provider == "main":
         return True
     # Allow any explicit Cerebras model key if it is a real option.
+    try:
+        from bot.handlers import available_models
+
+        return any(model["key"] == provider for model in available_models())
+    except Exception:
+        return False
+
+
+def _is_writable_provider(provider: str) -> bool:
+    """Write-time check: is this a key we recognise and are willing to persist?
+    More permissive than the read check — 'hf' is accepted even when
+    HF_SPACE_ID is currently unset, because get_provider() safely falls back
+    to the default on read if HF stays unconfigured (stale-safe)."""
+    if not provider or not provider.strip():
+        return False
+    if provider in ("main", "hf"):
+        return True
     try:
         from bot.handlers import available_models
 
@@ -39,7 +59,7 @@ def get_provider(user_id: int) -> str:
 
 def set_provider(user_id: int, provider: str) -> bool:
     """Save the user's provider choice or explicit Cerebras model key."""
-    if not _is_valid_provider(provider):
+    if not _is_writable_provider(provider):
         return False
     if store is None:
         return False

@@ -193,14 +193,19 @@ COMMANDS = [
 
 
 def command_menu():
-    """Full (command, description) list, including the conditional /model
-    command. This is the *complete* list used by /help. Telegram's
-    set_my_commands "/" autocomplete accepts at most 100 commands, so
-    register_commands() (bot.clients) caps it there — /help still lists
+    """Full (command, description) list. This is the *complete* list used by
+    /help. /model, /models, and /sha are always available (they introspect
+    and switch the active model / report the running version, regardless of
+    HF config), so they are appended here rather than living in COMMANDS.
+    Telegram's set_my_commands "/" autocomplete accepts at most 100 commands,
+    so register_commands() (bot.clients) caps it there — /help still lists
     everything (send_reply splits it across messages if needed)."""
     cmds = list(COMMANDS)
-    if HF_SPACE_ID:
-        cmds.append(("model", "switch AI provider"))
+    cmds += [
+        ("model", "show or switch the AI model"),
+        ("models", "list the available AI models"),
+        ("sha", "show the running version (commit SHA)"),
+    ]
     return cmds
 
 
@@ -2681,42 +2686,106 @@ def cmd_pdf(message):
     )
 
 
-if HF_SPACE_ID:
+# --- AI model registry + /model, /models, /sha -----------------------------
+# The bot always exposes at least two Cerebras model ids ("main" = the
+# configured MODEL, plus the alternate qwen id). When HF_SPACE_ID is set, the
+# ArmGPT Hugging Face space ("hf") is offered too. Each model is a dict with
+# key / name / description. get_provider stores the user's choice by key;
+# providers.generate() routes "main"/<cerebras-id> to Cerebras and "hf" to HF.
 
-    @bot.message_handler(commands=["model"], func=is_allowed)
-    def cmd_model(message):
-        parts = (message.text or "").split(maxsplit=1)
-        if len(parts) == 1:
-            current = get_provider(message.from_user.id)
-            bot.send_message(
-                message.chat.id,
-                f"Current provider: {current}\n\n"
-                "Options:\n"
-                "/model main — Cerebras (fast, multilingual, with memory)\n"
-                "/model hf — ArmGPT (Armenian only, slow, no memory)",
-            )
-            return
-        choice = parts[1].strip().lower()
-        if choice not in ("main", "hf"):
-            bot.send_message(
-                message.chat.id, "Invalid choice. Use: /model main or /model hf"
-            )
-            return
-        if not set_provider(message.from_user.id, choice):
-            bot.send_message(
-                message.chat.id, "Could not save preference. Try again later."
-            )
-            return
-        if choice == "hf":
-            bot.send_message(
-                message.chat.id,
-                "Switched to hf (ArmGPT).\n\n"
-                "Note: this is a tiny base completion model trained only on Armenian text. "
-                "It will continue whatever you write rather than answer questions, "
-                "and it does not understand English. Replies take ~30-60s and there is no memory.",
-            )
-        else:
-            bot.send_message(message.chat.id, "Switched to Main Provider.")
+QWEN_MODEL_ID = "qwen-3-235b-a22b-instruct-2507"
+
+
+def available_models():
+    """Return the selectable models as {key, name, description} dicts.
+
+    Reads MODEL and HF_SPACE_ID at call time so tests can patch them."""
+    models = [
+        {"key": "main", "name": MODEL,
+         "description": "Cerebras — fast and multilingual, with conversation memory"},
+        {"key": QWEN_MODEL_ID, "name": QWEN_MODEL_ID,
+         "description": "Cerebras Qwen — stronger reasoning, multilingual, a bit slower"},
+    ]
+    if HF_SPACE_ID:
+        models.append(
+            {"key": "hf", "name": "ArmGPT",
+             "description": "Armenian only, slow, no memory"}
+        )
+    return models
+
+
+def _resolve_model(text):
+    """Match user input to a model by key or display name (case-insensitive).
+    Returns the model dict, or None if nothing matches."""
+    query = (text or "").strip().lower()
+    if not query:
+        return None
+    for model in available_models():
+        if query == model["key"].lower() or query == model["name"].lower():
+            return model
+    return None
+
+
+def active_model(user_id):
+    """The model dict the user is currently on. Falls back to the first model
+    (main) if their saved preference is no longer available (e.g. a stale 'hf'
+    after HF was unconfigured)."""
+    provider = get_provider(user_id)
+    models = available_models()
+    for model in models:
+        if model["key"] == provider:
+            return model
+    return models[0]
+
+
+@bot.message_handler(commands=["sha"], func=is_allowed)
+def cmd_sha(message):
+    bot.send_message(message.chat.id, f"Live SHA: {COMMIT_SHA or 'unknown'}")
+
+
+@bot.message_handler(commands=["model"], func=is_allowed)
+def cmd_model(message):
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) == 1:
+        current = active_model(message.from_user.id)
+        msg = f"Current model: {current['name']}"
+        if HF_SPACE_ID:
+            msg += "\n\nSee /models to list the options and switch."
+        bot.send_message(message.chat.id, msg)
+        return
+    model = _resolve_model(parts[1])
+    if model is None:
+        bot.send_message(
+            message.chat.id,
+            f"Unknown model: {parts[1].strip()}. See /models for the options.",
+        )
+        return
+    if not set_provider(message.from_user.id, model["key"]):
+        bot.send_message(message.chat.id, "Could not save your preference. Try again later.")
+        return
+    if model["key"] == "hf":
+        bot.send_message(
+            message.chat.id,
+            "Switched to hf (ArmGPT).\n\n"
+            "Note: this is a tiny base completion model trained only on Armenian text. "
+            "It continues whatever you write rather than answering questions, and it "
+            "does not understand English. Replies take ~30-60s and there is no memory.",
+        )
+    else:
+        bot.send_message(message.chat.id, f"Switched to Main ({model['name']}).")
+
+
+@bot.message_handler(commands=["models"], func=is_allowed)
+def cmd_models(message):
+    active = active_model(message.from_user.id)
+    lines = []
+    for model in available_models():
+        marker = "  (active)" if model["key"] == active["key"] else ""
+        lines.append(f"{model['name']} — {model['description']}{marker}")
+    text = "\n".join(lines)
+    if HF_SPACE_ID:
+        text += "\n\nSwitch with /model <name>."
+    bot.send_message(message.chat.id, text)
 
 
 @bot.message_handler(content_types=["text"], func=is_allowed)

@@ -157,14 +157,11 @@ def register_commands() -> str:
         from bot.handlers import command_menu
 
         menu = command_menu()
-        # Telegram's set_my_commands accepts at most 100 commands. /help
-        # lists the full set; here we cap the "/" autocomplete menu to fit,
-        # keeping the trailing /model entry (if present) rather than dropping it.
-        if len(menu) > 100:
-            if menu[-1][0] == "model":
-                menu = menu[:99] + menu[-1:]
-            else:
-                menu = menu[:100]
+        # Telegram's set_my_commands accepts at most 100 commands. /help lists
+        # the full set (send_reply splits it); here we cap the "/" autocomplete
+        # menu to the first 100 to fit. Commands beyond that still work when
+        # typed and appear in /help.
+        menu = menu[:100]
         cmds = [telebot.types.BotCommand(name, desc) for name, desc in menu]
         result = bot.set_my_commands(cmds)
     except Exception as e:

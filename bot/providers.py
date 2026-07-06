@@ -19,12 +19,14 @@ HF_TEMPERATURE = 0.6
 HF_TOP_K = 30
 
 
-def _call_main(messages: list, retries: int = AI_RETRIES):
+def _call_main(messages: list, retries: int = AI_RETRIES, model: str = None):
     """Call the OpenAI-compatible API with bounded retries.
 
-    Each attempt is capped by AI_REQUEST_TIMEOUT and the per-attempt timeout
-    is dynamically reduced if the wall-clock budget is shrinking, so total
-    elapsed time stays under Telegram's ~60s webhook window even on the worst path.
+    `model` selects the Cerebras model id; it defaults to the configured
+    MODEL. Each attempt is capped by AI_REQUEST_TIMEOUT and the per-attempt
+    timeout is dynamically reduced if the wall-clock budget is shrinking, so
+    total elapsed time stays under Telegram's ~60s webhook window even on the
+    worst path.
     """
     deadline = time.monotonic() + AI_REQUEST_TIMEOUT * retries + retries
     for attempt in range(retries):
@@ -34,7 +36,7 @@ def _call_main(messages: list, retries: int = AI_RETRIES):
         timeout = min(AI_REQUEST_TIMEOUT, remaining)
         try:
             response = ai.chat.completions.create(
-                model=MODEL,
+                model=model or MODEL,
                 messages=messages,
                 timeout=timeout,
             )
@@ -105,4 +107,7 @@ def generate(user_id: int, messages: list) -> str:
     provider = get_provider(user_id)
     if provider == "hf":
         return _call_hf(messages)
-    return _call_main(messages)
+    # "main" uses the configured default MODEL; any other key is itself an
+    # explicit Cerebras model id to route to.
+    model = None if provider == "main" else provider
+    return _call_main(messages, model=model)
