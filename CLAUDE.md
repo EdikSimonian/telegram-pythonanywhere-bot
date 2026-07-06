@@ -83,6 +83,7 @@ telegram-pythonanywhere-bot/
 | `SQLITE_PATH` | No | — | Absolute path to a SQLite DB file. When set, enables history / rate limit / preferences / dedupe. When unset, bot runs in **stateless mode**. On PA use `/home/<your-pa-username>/bot.db` |
 | `AI_BASE_URL` | No | `https://api.cerebras.ai/v1` | Any OpenAI-compatible base URL |
 | `AI_MODEL` | No | `gpt-oss-120b` | Model name for the provider |
+| `ALT_CEREBRAS_MODELS` | No | _(empty)_ | Comma-separated extra Cerebras model ids to offer as switchable options in `/model` / `/models`. Empty by default — only add ids your `AI_API_KEY` actually has access to, or `/model <id>` will 404 (and `generate()` falls back to `MODEL`). Note: not every account has access to every model (e.g. `qwen-3-235b-a22b-instruct-2507` 404s on some free-tier keys) |
 | `HF_SPACE_ID` | No | — | Hugging Face Gradio space ID (e.g. `edisimon/armgpt-demo`) — enables `/model` command when set |
 | `HF_TOKEN` | No | — | HF auth token — only needed if the Gradio space is private or gated |
 | `TOGETHER_API_KEY` | No | — | When set, `/image` generates via Together AI (`api.together.xyz` — on PA's outbound allowlist). When unset, `/image` falls back to keyless pollinations.ai (works locally; needs a PA allowlist request to reach `image.pollinations.ai` from PA free tier) |
@@ -115,28 +116,22 @@ The bot uses the OpenAI Python SDK pointed at any OpenAI-compatible endpoint. Sw
 
 **Cerebras model IDs** (exact strings — wrong format causes 404):
 - `gpt-oss-120b` ✓ verified working on free tier. Current default (`bot/config.py`, `.env.example`) — strong reasoning at Cerebras speed
-- `qwen-3-235b-a22b-instruct-2507` ✓ verified working on free tier. Strong reasoning and multilingual, but slower per-token and more queue-pressured
+- `qwen-3-235b-a22b-instruct-2507` — availability is **account-dependent**: some free-tier keys have it, others 404 ("does not exist or you do not have access to it"). Not offered by default; add it to `ALT_CEREBRAS_MODELS` only after confirming your key can call it. Strong reasoning and multilingual, but slower per-token and more queue-pressured
 - `llama3.1-8b` ✗ deprecated by Cerebras — do not use (was the previous default)
 
 ---
 
 ## Multi-provider support
 
-The bot can dispatch requests to one of several supported models per user. Provider identifiers include **`main`**, explicit Cerebras model IDs like `qwen-3-235b-a22b-instruct-2507`, and **`hf`**.
+The bot can dispatch requests to one of several models per user. Provider identifiers are **`main`**, any id listed in **`ALT_CEREBRAS_MODELS`**, and **`hf`**.
 
 1. **`main`** (default) — the default Cerebras model from `AI_MODEL`.
-2. **`qwen-3-235b-a22b-instruct-2507`** — another supported Cerebras model ID available in the template.
+2. **alternate Cerebras ids** — whatever is set in `ALT_CEREBRAS_MODELS` (comma-separated). **Empty by default**, so out of the box only `main` (and `hf`, if configured) is offered. This is deliberate: advertising a model the account can't access makes `/model <id>` 404. (`generate()` falls back to `MODEL` on such a 404, so it degrades gracefully, but the honest fix is to only list ids the key has.)
 3. **`hf`** (optional) — a Hugging Face Gradio space set via `HF_SPACE_ID` (with optional `HF_TOKEN` for private spaces). Called via `gradio_client.Client(...).predict(prompt, length, temperature, top_k, api_name="/generate")`. No retry (HF is slow).
 
-**When `HF_SPACE_ID` is empty, the bot still supports multiple Cerebras model IDs** — `/model` and `/models` let users switch between the default Cerebras model and supported alternate IDs.
+`available_models()` in `bot/handlers.py` builds the list (`main` + `ALT_CEREBRAS_MODELS` + `hf`). `/model` shows/switches the current model (accepts a key or display name), `/models` lists them with an `(active)` marker. The switch hint only appears when more than one model is available.
 
-**When `HF_SPACE_ID` is set**, users also get an HF option:
-- `/model` — show current model and options
-- `/model main` — switch to the default Cerebras model
-- `/model qwen-3-235b-a22b-instruct-2507` — switch to the alternate Cerebras model
-- `/model hf` — switch to the HF space
-
-Preferences are stored via `store` under `provider:{user_id}` (no TTL). If the store is not configured (stateless mode), the bot falls back to `DEFAULT_PROVIDER` (`"main"`).
+Preferences are stored via `store` under `provider:{user_id}` (no TTL). If the store is not configured (stateless mode), the bot falls back to `DEFAULT_PROVIDER` (`"main"`). A saved preference that is no longer in `available_models()` (e.g. an id removed from `ALT_CEREBRAS_MODELS`) is treated as invalid on read and falls back to `main`.
 
 **HF provider caveats** — the current target (`edisimon/armgpt-demo`, ArmGPT) has:
 - Base completion model, not a chat model — `bot/providers.py::_last_user_message` extracts only the most recent user message and passes it as a bare prompt. Chat transcripts (`"User: ...\nAssistant: ..."`) would just confuse it since it was trained on raw Armenian text with no turn structure

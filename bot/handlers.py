@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote, unquote
 from bot.clients import bot, BOT_INFO, store
 from bot.config import (
+    ALT_CEREBRAS_MODELS,
     CF_ACCOUNT_ID,
     CF_API_TOKEN,
     CF_IMAGE_MODEL,
@@ -2830,25 +2831,27 @@ def cmd_pdf(message):
 
 
 # --- AI model registry + /model, /models, /sha -----------------------------
-# The bot always exposes at least two Cerebras model ids ("main" = the
-# configured MODEL, plus the alternate qwen id). When HF_SPACE_ID is set, the
-# ArmGPT Hugging Face space ("hf") is offered too. Each model is a dict with
-# key / name / description. get_provider stores the user's choice by key;
-# providers.generate() routes "main"/<cerebras-id> to Cerebras and "hf" to HF.
-
-QWEN_MODEL_ID = "qwen-3-235b-a22b-instruct-2507"
-
+# "main" is the configured MODEL. Extra Cerebras model ids the account can
+# access are added via the ALT_CEREBRAS_MODELS env var (empty by default — we
+# don't advertise models the key can't use, which would 404). When HF_SPACE_ID
+# is set, the ArmGPT Hugging Face space ("hf") is offered too. Each model is a
+# dict with key / name / description. get_provider stores the user's choice by
+# key; providers.generate() routes "main"/<cerebras-id> to Cerebras, "hf" to HF.
 
 def available_models():
     """Return the selectable models as {key, name, description} dicts.
 
-    Reads MODEL and HF_SPACE_ID at call time so tests can patch them."""
+    Reads MODEL, ALT_CEREBRAS_MODELS and HF_SPACE_ID at call time so tests can
+    patch them."""
     models = [
         {"key": "main", "name": MODEL,
          "description": "Cerebras — fast and multilingual, with conversation memory"},
-        {"key": QWEN_MODEL_ID, "name": QWEN_MODEL_ID,
-         "description": "Cerebras Qwen — stronger reasoning, multilingual, a bit slower"},
     ]
+    for model_id in ALT_CEREBRAS_MODELS:
+        models.append(
+            {"key": model_id, "name": model_id,
+             "description": "Cerebras — alternate model"}
+        )
     if HF_SPACE_ID:
         models.append(
             {"key": "hf", "name": "ArmGPT",
@@ -2892,7 +2895,7 @@ def cmd_model(message):
     if len(parts) == 1:
         current = active_model(message.from_user.id)
         msg = f"Current model: {current['name']}"
-        if HF_SPACE_ID:
+        if len(available_models()) > 1:
             msg += "\n\nSee /models to list the options and switch."
         bot.send_message(message.chat.id, msg)
         return
@@ -2926,7 +2929,7 @@ def cmd_models(message):
         marker = "  (active)" if model["key"] == active["key"] else ""
         lines.append(f"{model['name']} — {model['description']}{marker}")
     text = "\n".join(lines)
-    if HF_SPACE_ID:
+    if len(available_models()) > 1:
         text += "\n\nSwitch with /model <name>."
     bot.send_message(message.chat.id, text)
 

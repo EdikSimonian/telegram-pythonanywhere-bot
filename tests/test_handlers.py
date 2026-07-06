@@ -352,28 +352,33 @@ def test_cmd_sha_reports_unknown_when_git_sha_unavailable():
 # get_provider(). All are patchable at the handler level — no module reload.
 
 
-def test_available_models_main_only_without_hf():
+def test_available_models_main_only_by_default():
+    """No alternate Cerebras models and no HF -> just 'main'. Alternate ids are
+    opt-in via ALT_CEREBRAS_MODELS so we never advertise a model the account
+    can't access."""
     import bot.handlers
 
     with (
         patch("bot.handlers.HF_SPACE_ID", ""),
+        patch("bot.handlers.ALT_CEREBRAS_MODELS", []),
         patch("bot.handlers.MODEL", "gpt-oss-120b"),
     ):
         models = bot.handlers.available_models()
-        assert [m["key"] for m in models] == ["main", "qwen-3-235b-a22b-instruct-2507"]
+        assert [m["key"] for m in models] == ["main"]
         assert models[0]["name"] == "gpt-oss-120b"
         assert models[0]["description"]
 
 
-def test_available_models_includes_hf_when_configured():
+def test_available_models_includes_alt_and_hf_when_configured():
     import bot.handlers
 
     with (
         patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.ALT_CEREBRAS_MODELS", ["llama3.1-8b"]),
         patch("bot.handlers.MODEL", "gpt-oss-120b"),
     ):
         keys = [m["key"] for m in bot.handlers.available_models()]
-        assert keys == ["main", "qwen-3-235b-a22b-instruct-2507", "hf"]
+        assert keys == ["main", "llama3.1-8b", "hf"]
 
 
 def test_active_model_reflects_provider():
@@ -402,13 +407,14 @@ def test_resolve_model_matches_key_and_name():
 
     with (
         patch("bot.handlers.HF_SPACE_ID", "fake/space"),
+        patch("bot.handlers.ALT_CEREBRAS_MODELS", ["llama3.1-8b"]),
         patch("bot.handlers.MODEL", "gpt-oss-120b"),
     ):
         assert bot.handlers._resolve_model("hf")["key"] == "hf"
         assert bot.handlers._resolve_model("ArmGPT")["key"] == "hf"
         assert bot.handlers._resolve_model("MAIN")["key"] == "main"
         assert bot.handlers._resolve_model("gpt-oss-120b")["key"] == "main"
-        assert bot.handlers._resolve_model("qwen-3-235b-a22b-instruct-2507")["key"] == "qwen-3-235b-a22b-instruct-2507"
+        assert bot.handlers._resolve_model("llama3.1-8b")["key"] == "llama3.1-8b"
         assert bot.handlers._resolve_model("nope") is None
 
 

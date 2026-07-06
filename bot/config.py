@@ -84,6 +84,14 @@ AI_API_KEY = os.environ["AI_API_KEY"].strip()
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.cerebras.ai/v1").strip()
 MODEL = os.environ.get("AI_MODEL", "gpt-oss-120b").strip()
 
+# Extra Cerebras model ids the account can access, offered as switchable
+# options by /model and /models (comma-separated). Empty by default — only add
+# ids your AI_API_KEY actually has access to, or /model <id> will 404 and fall
+# back to MODEL. Example: ALT_CEREBRAS_MODELS=qwen-3-235b-a22b-instruct-2507
+ALT_CEREBRAS_MODELS = [
+    m.strip() for m in os.environ.get("ALT_CEREBRAS_MODELS", "").split(",") if m.strip()
+]
+
 # Hugging Face provider (optional) — when set, users can switch via /model
 HF_SPACE_ID = os.environ.get("HF_SPACE_ID", "").strip()
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()  # optional, for private spaces
