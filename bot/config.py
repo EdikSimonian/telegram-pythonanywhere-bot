@@ -98,6 +98,15 @@ TOGETHER_IMAGE_MODEL = os.environ.get(
     "TOGETHER_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell-Free"
 ).strip()
 
+# Cloudflare Workers AI — another free image backend (api.cloudflare.com is on
+# PA's allowlist). Free tier runs FLUX.1-schnell. Needs a free account id + an
+# API token scoped to "Workers AI". Used by /image when both are set.
+CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID", "").strip()
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN", "").strip()
+CF_IMAGE_MODEL = os.environ.get(
+    "CF_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell"
+).strip()
+
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
 # stateless mode: history / rate limiting / preferences / dedupe all
 # degrade gracefully (the consumer modules in bot/ check `store is

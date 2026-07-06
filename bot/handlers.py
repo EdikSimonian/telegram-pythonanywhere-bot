@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 from urllib.parse import quote, unquote
 from bot.clients import bot, BOT_INFO, store
 from bot.config import (
+    CF_ACCOUNT_ID,
+    CF_API_TOKEN,
+    CF_IMAGE_MODEL,
     COMMIT_SHA,
     HF_SPACE_ID,
     HOSTING_LABEL,
@@ -2200,6 +2203,31 @@ def _generate_image_together(prompt, width=1024, height=1024):
     return data
 
 
+def _generate_image_cloudflare(prompt, width=1024, height=1024):
+    """Generate an image via Cloudflare Workers AI (free tier, FLUX.1-schnell).
+    FLUX returns JSON with a base64 image; some models (e.g. SDXL) return raw
+    image bytes — handle both by checking the response content type."""
+    import requests
+
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{CF_IMAGE_MODEL}"
+    resp = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {CF_API_TOKEN}"},
+        json={"prompt": prompt},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    if "application/json" in resp.headers.get("content-type", ""):
+        result = resp.json().get("result") or {}
+        b64 = result.get("image")
+        data = base64.b64decode(b64) if b64 else b""
+    else:
+        data = resp.content
+    if not data or len(data) < 1000:  # too small to be a real image
+        raise RuntimeError("the image service returned no image")
+    return data
+
+
 def _generate_image_pollinations(prompt, width=1024, height=1024):
     seed = random.randint(1, 1_000_000)
     url = (
@@ -2214,8 +2242,12 @@ def _generate_image_pollinations(prompt, width=1024, height=1024):
 
 
 def _generate_image(prompt, width=1024, height=1024):
+    """Pick the first configured image backend. All are free; whichever key(s)
+    are set win, else fall back to keyless pollinations."""
     if TOGETHER_API_KEY:
         return _generate_image_together(prompt, width, height)
+    if CF_ACCOUNT_ID and CF_API_TOKEN:
+        return _generate_image_cloudflare(prompt, width, height)
     return _generate_image_pollinations(prompt, width, height)
 
 
