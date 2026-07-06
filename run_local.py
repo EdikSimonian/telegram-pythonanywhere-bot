@@ -58,6 +58,7 @@ load_dotenv()
 # Set BEFORE the bot imports below.
 os.environ.setdefault("BOT_VERBOSE_LOG", "1")
 
+
 def preflight() -> None:
     """Fail fast with a friendly message if required env vars are missing.
 

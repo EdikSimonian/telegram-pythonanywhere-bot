@@ -96,7 +96,7 @@ def _call_hf(messages: list) -> str:
     text = _strip_html(str(text))
     # Remove the echoed prompt if the model includes it
     if text.startswith(prompt):
-        text = text[len(prompt) :].strip()
+        text = text[len(prompt):].strip()
     return text or "(empty response from ArmGPT)"
 
 
