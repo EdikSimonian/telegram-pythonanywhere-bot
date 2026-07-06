@@ -89,6 +89,15 @@ HF_SPACE_ID = os.environ.get("HF_SPACE_ID", "").strip()
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()  # optional, for private spaces
 DEFAULT_PROVIDER = "main"
 
+# Image generation for /image. When TOGETHER_API_KEY is set, /image uses
+# Together AI (api.together.xyz — on PythonAnywhere's outbound allowlist).
+# When unset, /image falls back to the keyless pollinations.ai service (which
+# works locally but needs an allowlist request to reach it from PA free tier).
+TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY", "").strip()
+TOGETHER_IMAGE_MODEL = os.environ.get(
+    "TOGETHER_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell-Free"
+).strip()
+
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
 # stateless mode: history / rate limiting / preferences / dedupe all
 # degrade gracefully (the consumer modules in bot/ check `store is

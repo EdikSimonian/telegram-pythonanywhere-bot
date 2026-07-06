@@ -13,7 +13,15 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import quote, unquote
 from bot.clients import bot, BOT_INFO, store
-from bot.config import COMMIT_SHA, HF_SPACE_ID, HOSTING_LABEL, MODEL, RATE_LIMIT
+from bot.config import (
+    COMMIT_SHA,
+    HF_SPACE_ID,
+    HOSTING_LABEL,
+    MODEL,
+    RATE_LIMIT,
+    TOGETHER_API_KEY,
+    TOGETHER_IMAGE_MODEL,
+)
 from bot.ai import ask_ai
 from bot.helpers import is_allowed, keep_typing, send_reply, should_respond
 from bot.history import clear_history
@@ -2134,9 +2142,11 @@ def cmd_coin(message):
     bot.send_message(message.chat.id, "🪙 " + random.choice(["Heads", "Tails"]))
 
 
-# --- Free image generation (Pollinations, no API key) -----------------------
-# /image turns a text prompt into an image using pollinations.ai — a free,
-# keyless service. It only needs outbound network access (no token, no cost).
+# --- Image generation for /image --------------------------------------------
+# When TOGETHER_API_KEY is set, /image uses Together AI (api.together.xyz — on
+# PythonAnywhere's outbound allowlist, FLUX.1-schnell-Free free tier). Without
+# a key it falls back to the keyless pollinations.ai service, which works
+# locally but needs a PA allowlist request to reach image.pollinations.ai.
 
 def _http_get_bytes(url, timeout=120):
     """GET a URL and return the raw bytes. Uses requests if available (it
@@ -2154,7 +2164,43 @@ def _http_get_bytes(url, timeout=120):
             return r.read()
 
 
-def _generate_image(prompt, width=1024, height=1024):
+def _generate_image_together(prompt, width=1024, height=1024):
+    """Generate an image via Together AI's OpenAI-compatible images endpoint.
+    Requests b64_json so we get the bytes directly (no second fetch to a CDN
+    host that might not be allowlisted)."""
+    import requests
+
+    resp = requests.post(
+        "https://api.together.xyz/v1/images/generations",
+        headers={"Authorization": f"Bearer {TOGETHER_API_KEY}"},
+        json={
+            "model": TOGETHER_IMAGE_MODEL,
+            "prompt": prompt,
+            "width": width,
+            "height": height,
+            "steps": 4,  # FLUX.1-schnell is tuned for ~4 steps
+            "n": 1,
+            "response_format": "b64_json",
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    items = resp.json().get("data") or []
+    if not items:
+        raise RuntimeError("the image service returned no image")
+    item = items[0]
+    if item.get("b64_json"):
+        data = base64.b64decode(item["b64_json"])
+    elif item.get("url"):
+        data = _http_get_bytes(item["url"], timeout=120)
+    else:
+        raise RuntimeError("the image service returned no image data")
+    if not data or len(data) < 1000:  # too small to be a real image
+        raise RuntimeError("the image service returned no image")
+    return data
+
+
+def _generate_image_pollinations(prompt, width=1024, height=1024):
     seed = random.randint(1, 1_000_000)
     url = (
         "https://image.pollinations.ai/prompt/"
@@ -2165,6 +2211,12 @@ def _generate_image(prompt, width=1024, height=1024):
     if not data or len(data) < 1000:  # too small to be a real image
         raise RuntimeError("the image service returned no image")
     return data
+
+
+def _generate_image(prompt, width=1024, height=1024):
+    if TOGETHER_API_KEY:
+        return _generate_image_together(prompt, width, height)
+    return _generate_image_pollinations(prompt, width, height)
 
 
 @bot.message_handler(commands=["image"], func=is_allowed)

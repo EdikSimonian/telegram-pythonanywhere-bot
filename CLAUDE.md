@@ -85,6 +85,8 @@ telegram-pythonanywhere-bot/
 | `AI_MODEL` | No | `gpt-oss-120b` | Model name for the provider |
 | `HF_SPACE_ID` | No | — | Hugging Face Gradio space ID (e.g. `edisimon/armgpt-demo`) — enables `/model` command when set |
 | `HF_TOKEN` | No | — | HF auth token — only needed if the Gradio space is private or gated |
+| `TOGETHER_API_KEY` | No | — | When set, `/image` generates via Together AI (`api.together.xyz` — on PA's outbound allowlist). When unset, `/image` falls back to keyless pollinations.ai (works locally; needs a PA allowlist request to reach `image.pollinations.ai` from PA free tier) |
+| `TOGETHER_IMAGE_MODEL` | No | `black-forest-labs/FLUX.1-schnell-Free` | Together model id used by `/image` |
 | `WEBHOOK_SECRET` | No | _auto-generated_ | Random string Telegram echoes back in `X-Telegram-Bot-Api-Secret-Token`. Auto-bootstrapped on first run: if the env var is unset, `bot/config.py::_bootstrap_webhook_secret()` generates a 64-hex secret, persists it to `.webhook_secret` (gitignored, mode 0600), and reuses it on subsequent boots. The boot-time `register_webhook()` then ships it to Telegram. Set the env var to override / share across envs |
 | `WEBHOOK_URL` | No | — | When set, the bot auto-registers this URL as the Telegram webhook on every worker boot and after every `/api/deploy`. No manual `setWebhook` step needed. Idempotent. On PA, value is `https://<your-pa-username>.pythonanywhere.com/api/webhook`. Leave unset for local polling |
 | `RATE_LIMIT` | No | `250` | Max messages per user per day |
