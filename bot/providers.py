@@ -107,7 +107,14 @@ def generate(user_id: int, messages: list) -> str:
     provider = get_provider(user_id)
     if provider == "hf":
         return _call_hf(messages)
-    # "main" uses the configured default MODEL; any other key is itself an
-    # explicit Cerebras model id to route to.
-    model = None if provider == "main" else provider
-    return _call_main(messages, model=model)
+    if provider == "main":
+        return _call_main(messages)
+    # Any other key is an explicit Cerebras model id. Try it, but if this
+    # account can't access it (e.g. 404 model_not_found), fall back to the
+    # default MODEL so the user still gets a reply instead of an error. Use a
+    # single attempt for the probe so the fallback is fast.
+    try:
+        return _call_main(messages, model=provider, retries=1)
+    except Exception as e:
+        print(f"model '{provider}' unavailable ({e}); falling back to {MODEL}")
+        return _call_main(messages)
