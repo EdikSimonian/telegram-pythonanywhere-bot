@@ -4,3 +4,6 @@ openai==2.30.0
 requests==2.33.1
 gradio-client==1.7.0
 pytest==9.0.2
+reportlab==5.0.0
+Pillow==12.3.0
+qrcode==8.2

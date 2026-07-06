@@ -2200,6 +2200,29 @@ def _http_get_text(url, timeout=30):
     return _http_get_bytes(url, timeout=timeout).decode("utf-8", "replace")
 
 
+def _make_qr_png(text):
+    """Render a QR code PNG. Prefer the local `qrcode` library (no network, so
+    it works even behind PythonAnywhere's outbound firewall); fall back to the
+    remote qrserver API if the library isn't installed. Returns bytes or None."""
+    try:
+        import qrcode
+
+        buf = io.BytesIO()
+        qrcode.make(text).save(buf, format="PNG")
+        return buf.getvalue()
+    except ImportError:
+        try:
+            url = (
+                "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data="
+                + quote(text, safe="")
+            )
+            return _http_get_bytes(url, timeout=30)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
 @bot.message_handler(commands=["qr"], func=is_allowed)
 def cmd_qr(message):
     text = _arg(message)
@@ -2210,11 +2233,9 @@ def cmd_qr(message):
         bot.send_chat_action(message.chat.id, "upload_photo")
     except Exception:
         pass
-    url = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=" + quote(text, safe="")
-    try:
-        data = _http_get_bytes(url, timeout=30)
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Couldn't make a QR code: {e}")
+    data = _make_qr_png(text)
+    if not data:
+        bot.send_message(message.chat.id, "Couldn't make a QR code right now.")
         return
     buf = io.BytesIO(data)
     buf.name = "qr.png"
@@ -2245,22 +2266,60 @@ def cmd_shorten(message):
     bot.send_message(message.chat.id, short)
 
 
+# WMO weather-interpretation codes → human text (open-meteo `weather_code`).
+_WMO_WEATHER = {
+    0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Fog", 48: "Depositing rime fog", 51: "Light drizzle", 53: "Drizzle",
+    55: "Dense drizzle", 56: "Freezing drizzle", 57: "Dense freezing drizzle",
+    61: "Slight rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain",
+    67: "Heavy freezing rain", 71: "Slight snow", 73: "Snow", 75: "Heavy snow",
+    77: "Snow grains", 80: "Slight rain showers", 81: "Rain showers",
+    82: "Violent rain showers", 85: "Snow showers", 86: "Heavy snow showers",
+    95: "Thunderstorm", 96: "Thunderstorm with hail", 99: "Thunderstorm with heavy hail",
+}
+
+
 @bot.message_handler(commands=["weather"], func=is_allowed)
 def cmd_weather(message):
     city = _arg(message)
     if not city:
         bot.send_message(message.chat.id, "Usage: /weather <city>  (e.g. /weather Yerevan)")
         return
-    api = "https://wttr.in/" + quote(city, safe="") + "?format=3&m"
+    # open-meteo is keyless and on PythonAnywhere's outbound allowlist
+    # (geocoding-api / api.open-meteo.com). Geocode the city, then fetch the
+    # current conditions for its coordinates.
     try:
-        text = _http_get_text(api, timeout=20).strip()
+        geo = json.loads(_http_get_text(
+            "https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name="
+            + quote(city, safe=""),
+            timeout=20,
+        ))
+        results = geo.get("results") or []
+        if not results:
+            bot.send_message(message.chat.id, f"Couldn't find a place called '{city}'.")
+            return
+        loc = results[0]
+        lat, lon = loc["latitude"], loc["longitude"]
+        forecast = json.loads(_http_get_text(
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
+            timeout=20,
+        ))
     except Exception as e:
         bot.send_message(message.chat.id, f"Couldn't get the weather: {e}")
         return
-    if not text or "Unknown location" in text or len(text) > 300:
-        bot.send_message(message.chat.id, f"Couldn't find weather for '{city}'.")
+    cur = forecast.get("current") or {}
+    if "temperature_2m" not in cur:
+        bot.send_message(message.chat.id, f"Couldn't get the weather for '{city}'.")
         return
-    bot.send_message(message.chat.id, text)
+    place = ", ".join(p for p in (loc.get("name"), loc.get("country")) if p)
+    desc = _WMO_WEATHER.get(cur.get("weather_code"), "")
+    lines = [f"Weather in {place or city}:"]
+    if desc:
+        lines.append(desc)
+    lines.append(f"Temp: {cur['temperature_2m']}°C (feels {cur.get('apparent_temperature', '?')}°C)")
+    lines.append(f"Wind: {cur.get('wind_speed_10m', '?')} km/h")
+    bot.send_message(message.chat.id, "\n".join(lines))
 
 
 @bot.message_handler(commands=["define"], func=is_allowed)
