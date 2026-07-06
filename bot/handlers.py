@@ -244,7 +244,7 @@ def cmd_joke(message):
         "Keep it short (1-2 lines) and make sure it actually lands with a clever punchline. "
         "Reply with only the joke — no preamble, no explanation.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["quote"], func=is_allowed)
@@ -256,7 +256,7 @@ def cmd_quote(message):
         "Format it as:\n\"<quote>\"\n— <author>\n"
         "Reply with only the quote — no preamble, no explanation.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["fact"], func=is_allowed)
@@ -267,7 +267,7 @@ def cmd_fact(message):
         "Keep it to 1-3 sentences and make it something most people wouldn't already know. "
         "Reply with only the fact — no preamble, no explanation.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["compliment"], func=is_allowed)
@@ -278,7 +278,7 @@ def cmd_compliment(message):
         "Make it uplifting and specific rather than generic flattery, and keep it to 1-2 sentences. "
         "Reply with only the compliment — no preamble, no explanation.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["explain"], func=is_allowed)
@@ -293,7 +293,7 @@ def cmd_explain(message):
         "Use plain language, keep it concise, and include one short example if it helps. "
         "Reply with only the explanation — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["challenge"], func=is_allowed)
@@ -305,7 +305,7 @@ def cmd_challenge(message):
         "Keep it beginner-friendly and solvable in a few lines of code. "
         "Do NOT include the solution. Reply with only the challenge — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["analogy"], func=is_allowed)
@@ -319,7 +319,7 @@ def cmd_analogy(message):
         f"Explain this coding concept using one clear, relatable real-world analogy: {concept}. "
         "Keep it short and make the analogy do the work. Reply with only the analogy — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["motivate"], func=is_allowed)
@@ -330,7 +330,7 @@ def cmd_motivate(message):
         "who is learning to code and might feel stuck or frustrated. "
         "Keep it warm and encouraging, 1-2 sentences. Reply with only the message — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["translate"], func=is_allowed)
@@ -351,7 +351,7 @@ def cmd_translate(message):
         "Keep the same behavior and logic. Reply with only the translated code in a code block, "
         f"followed by one short sentence noting anything that changed.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["debug"], func=is_allowed)
@@ -366,7 +366,7 @@ def cmd_debug(message):
         "then show the corrected code in a code block. If there is no bug, say so. "
         f"Keep it concise. Reply with only the answer — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["review"], func=is_allowed)
@@ -382,7 +382,7 @@ def cmd_review(message):
         "Be encouraging and keep it concise. "
         f"Reply with only the review — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 # --- Coding tools (AI) ------------------------------------------------------
@@ -399,7 +399,7 @@ def cmd_snippet(message):
         "Pick a sensible language if none is specified. Reply with only the code in a code "
         "block, plus one short sentence on how to use it. No preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["error"], func=is_allowed)
@@ -414,7 +414,7 @@ def cmd_error(message):
         "a concrete fix. Keep it concise. Reply with only the answer — no preamble.\n\n"
         f"Error:\n{err}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["optimize"], func=is_allowed)
@@ -429,7 +429,7 @@ def cmd_optimize(message):
         "in 1-2 sentences, then show the optimized version in a code block. Keep the same "
         f"behavior. Reply with only the answer — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["refactor"], func=is_allowed)
@@ -444,7 +444,7 @@ def cmd_refactor(message):
         "behavior. Note the key changes in 1-2 sentences, then show the refactored code in a "
         f"code block. Reply with only the answer — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["test"], func=is_allowed)
@@ -459,7 +459,7 @@ def cmd_test(message):
         "edge cases, using the language's standard testing style. Reply with only the tests "
         f"in a code block — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["document"], func=is_allowed)
@@ -474,7 +474,7 @@ def cmd_document(message):
         "what the code does. Keep comments concise and useful. Reply with only the documented "
         f"code in a code block — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["complexity"], func=is_allowed)
@@ -489,7 +489,7 @@ def cmd_complexity(message):
         "clearly, then explain why in 1-2 sentences. If it can be improved, mention the better "
         f"complexity briefly. Reply with only the analysis — no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["security"], func=is_allowed)
@@ -504,7 +504,7 @@ def cmd_security(message):
         "how to fix each one. If it looks safe, say so. Be concise. Reply with only the review "
         f"— no preamble.\n\nCode:\n{code}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["regex"], func=is_allowed)
@@ -522,7 +522,7 @@ def cmd_regex(message):
         "explain each part in a few short bullet points and give one matching example. "
         "Keep it concise. Reply with only the answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["sql"], func=is_allowed)
@@ -537,7 +537,7 @@ def cmd_sql(message):
         "code block, then explain it in one or two short sentences. If you assume table or "
         "column names, note them briefly. Reply with only the answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["schema"], func=is_allowed)
@@ -555,7 +555,7 @@ def cmd_schema(message):
         "keys, and note the relationships between them. Keep it concise. Reply with only the "
         "schema — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["api"], func=is_allowed)
@@ -570,7 +570,7 @@ def cmd_api(message):
         "does, and the key request/response fields. Keep it concise. Reply with only the "
         "design — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["pseudocode"], func=is_allowed)
@@ -584,7 +584,7 @@ def cmd_pseudocode(message):
         f"Write clear, language-agnostic pseudocode for this task: {task}. Use simple numbered "
         "steps or indented structure. Reply with only the pseudocode in a code block — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["dockerfile"], func=is_allowed)
@@ -599,7 +599,7 @@ def cmd_dockerfile(message):
         "sensible base image and good practices (small layers, no secrets). Reply with only the "
         "Dockerfile in a code block, plus one short note if needed. No preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["gitignore"], func=is_allowed)
@@ -613,7 +613,7 @@ def cmd_gitignore(message):
         f"Generate a sensible .gitignore for this stack/tooling: {stack}. Reply with only the "
         ".gitignore contents in a code block — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["git"], func=is_allowed)
@@ -630,7 +630,7 @@ def cmd_git(message):
         f"Answer this git question with the exact commands to run and a one-line explanation of "
         f"each: {q}. Keep it concise. Reply with only the answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["commit"], func=is_allowed)
@@ -649,7 +649,7 @@ def cmd_commit(message):
         "short body bullets only if useful. Reply with only the commit message in a code block "
         "— no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["name"], func=is_allowed)
@@ -666,7 +666,7 @@ def cmd_name(message):
         f"Suggest 5 clear, idiomatic names for this, each with a short note: {desc}. Prefer "
         "descriptive, conventional names. Reply with only the list — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["compare"], func=is_allowed)
@@ -680,7 +680,7 @@ def cmd_compare(message):
         f"Compare these clearly and fairly: {topic}. Cover the key differences and note when to "
         "use each. Keep it concise and balanced. Reply with only the comparison — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["eli5"], func=is_allowed)
@@ -694,7 +694,7 @@ def cmd_eli5(message):
         f"Explain this like I'm five years old, in simple words with a friendly tone: {topic}. "
         "Keep it to a few short sentences. Reply with only the explanation — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["cheatsheet"], func=is_allowed)
@@ -709,7 +709,7 @@ def cmd_cheatsheet(message):
         "concepts with a one-line description each, grouped if it helps. Keep it compact and "
         "skimmable. Reply with only the cheatsheet — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["roadmap"], func=is_allowed)
@@ -723,7 +723,7 @@ def cmd_roadmap(message):
         f"Create a concise learning roadmap for: {topic}. Give ordered steps or stages from "
         "beginner to advanced, each with a short note. Reply with only the roadmap — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 # --- More coding tools (AI) -------------------------------------------------
@@ -739,7 +739,7 @@ def cmd_explaincode(message):
         "Explain what the following code does, step by step and in plain language. Keep it "
         "clear and concise. Reply with only the explanation — no preamble.\n\nCode:\n" + code,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["lint"], func=is_allowed)
@@ -754,7 +754,7 @@ def cmd_lint(message):
         "conventions, small code smells) and how to fix each. If it's clean, say so. Be "
         "concise. Reply with only the feedback — no preamble.\n\nCode:\n" + code,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["types"], func=is_allowed)
@@ -769,7 +769,7 @@ def cmd_types(message):
         "typing. Do not change behavior. Reply with only the annotated code in a code block — "
         "no preamble.\n\nCode:\n" + code,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["oneliner"], func=is_allowed)
@@ -787,7 +787,7 @@ def cmd_oneliner(message):
         "keeping it correct. Show it in a code block and add one short note if it hurts "
         "readability. Reply with only the answer — no preamble.\n\nCode/Task:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["edgecases"], func=is_allowed)
@@ -805,7 +805,7 @@ def cmd_edgecases(message):
         "Give a short bulleted list, each with a one-line reason. Reply with only the list — "
         "no preamble.\n\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["algo"], func=is_allowed)
@@ -823,7 +823,7 @@ def cmd_algo(message):
         "give its time/space complexity, and outline the idea in a few sentences. Do NOT write "
         "full code. Reply with only the answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["bash"], func=is_allowed)
@@ -841,7 +841,7 @@ def cmd_bash(message):
         "one-liner if possible. Show it in a code block, then explain it in one short sentence. "
         "Reply with only the answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["curl"], func=is_allowed)
@@ -859,7 +859,7 @@ def cmd_curl(message):
         "flags. Show it in a code block, then one short line explaining it. Reply with only the "
         "answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["cron"], func=is_allowed)
@@ -874,7 +874,7 @@ def cmd_cron(message):
         "code block, then explain each field in one short line. Reply with only the answer — "
         "no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["ci"], func=is_allowed)
@@ -889,7 +889,7 @@ def cmd_ci(message):
         "setup, install, test). Reply with only the YAML in a code block, plus one short note "
         "if needed. No preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["scaffold"], func=is_allowed)
@@ -904,7 +904,7 @@ def cmd_scaffold(message):
         "the key starter files with minimal boilerplate. Keep it concise. Reply with only the "
         "scaffold — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["design"], func=is_allowed)
@@ -919,7 +919,7 @@ def cmd_design(message):
         "interact, the data flow, and 1-2 key trade-offs. Keep it concise. Reply with only the "
         "design — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["pattern"], func=is_allowed)
@@ -937,7 +937,7 @@ def cmd_pattern(message):
         "pattern, explain why it fits in a few sentences, and sketch how it'd be applied. Reply "
         "with only the answer — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["stack"], func=is_allowed)
@@ -952,7 +952,7 @@ def cmd_stack(message):
         "main layers (frontend, backend, database, hosting as relevant) with a one-line reason "
         "each. Reply with only the recommendation — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["readme"], func=is_allowed)
@@ -967,7 +967,7 @@ def cmd_readme(message):
         "description, features, install, usage). Keep it concise. Reply with only the README in "
         "Markdown — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["makefile"], func=is_allowed)
@@ -982,7 +982,7 @@ def cmd_makefile(message):
         "install, run, test, lint, clean) as relevant. Reply with only the Makefile in a code "
         "block — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["compose"], func=is_allowed)
@@ -1000,7 +1000,7 @@ def cmd_compose(message):
         "volumes, and env. Reply with only the YAML in a code block, plus one short note if "
         "needed. No preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["dotenv"], func=is_allowed)
@@ -1018,7 +1018,7 @@ def cmd_dotenv(message):
         "variables with placeholder values and a short comment each. Reply with only the .env in "
         "a code block — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["mockdata"], func=is_allowed)
@@ -1033,7 +1033,7 @@ def cmd_mockdata(message):
         "3-5 items) with sensible field values. Reply with only the JSON in a code block — no "
         "preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["sqlformat"], func=is_allowed)
@@ -1048,7 +1048,7 @@ def cmd_sqlformat(message):
         "and line breaks) without changing what it does. Reply with only the formatted SQL in a "
         "code block — no preamble.\n\nSQL:\n" + sql,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["regexplain"], func=is_allowed)
@@ -1063,7 +1063,7 @@ def cmd_regexplain(message):
         "example of what it matches. Keep it concise. Reply with only the explanation — no "
         "preamble.\n\nRegex:\n" + rx,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["changelog"], func=is_allowed)
@@ -1081,7 +1081,7 @@ def cmd_changelog(message):
         "Added/Changed/Fixed/Removed as relevant (Keep a Changelog style). Reply with only the "
         "entry in Markdown — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["userstory"], func=is_allowed)
@@ -1096,7 +1096,7 @@ def cmd_userstory(message):
         "that <benefit>' format, followed by 3-5 acceptance criteria. Reply with only the story "
         "— no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["interview"], func=is_allowed)
@@ -1111,7 +1111,7 @@ def cmd_interview(message):
         "clearly, then on a new line briefly note what skill it tests. Do NOT give the "
         "solution. Reply with only that — no preamble.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 # --- 30 more coding tools (AI) ----------------------------------------------
@@ -1132,7 +1132,7 @@ def cmd_mermaid(message):
         "short note. "
         "\n\nDescribe:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["uml"], func=is_allowed)
@@ -1151,7 +1151,7 @@ def cmd_uml(message):
         "Reply with only the design — no preamble. "
         "\n\nSystem:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["flowchart"], func=is_allowed)
@@ -1169,7 +1169,7 @@ def cmd_flowchart(message):
         "Number the steps and show any branches. Reply with only the flowchart — no preamble. "
         "\n\nProcess:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["benchmark"], func=is_allowed)
@@ -1188,7 +1188,7 @@ def cmd_benchmark(message):
         "code block, plus one short note on how to read the result. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["graphql"], func=is_allowed)
@@ -1206,7 +1206,7 @@ def cmd_graphql(message):
         "mutations. Reply with only the schema in a code block — no preamble. "
         "\n\nRequirement:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["openapi"], func=is_allowed)
@@ -1225,7 +1225,7 @@ def cmd_openapi(message):
         "with only the YAML in a code block — no preamble. "
         "\n\nAPI:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["k8s"], func=is_allowed)
@@ -1244,7 +1244,7 @@ def cmd_k8s(message):
         "block, plus one short note. "
         "\n\nDeploy:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["terraform"], func=is_allowed)
@@ -1263,7 +1263,7 @@ def cmd_terraform(message):
         "note. "
         "\n\nResource:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["nginx"], func=is_allowed)
@@ -1282,7 +1282,7 @@ def cmd_nginx(message):
         "block, plus one short note. "
         "\n\nNeed:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["orm"], func=is_allowed)
@@ -1301,7 +1301,7 @@ def cmd_orm(message):
         "block, plus one short note. "
         "\n\nModel:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["auth"], func=is_allowed)
@@ -1320,7 +1320,7 @@ def cmd_auth(message):
         "Keep it concise. Reply with only the answer — no preamble. "
         "\n\nNeed:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["jwt"], func=is_allowed)
@@ -1339,7 +1339,7 @@ def cmd_jwt(message):
         "plus one short note. "
         "\n\nStack:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["validate"], func=is_allowed)
@@ -1358,7 +1358,7 @@ def cmd_validate(message):
         "Reply with only the code in a code block — no preamble. "
         "\n\nValidate:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["logging"], func=is_allowed)
@@ -1377,7 +1377,7 @@ def cmd_logging(message):
         "block, plus one short note. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["retry"], func=is_allowed)
@@ -1396,7 +1396,7 @@ def cmd_retry(message):
         "code in a code block, plus one short note. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["cache"], func=is_allowed)
@@ -1415,7 +1415,7 @@ def cmd_cache(message):
         "plus one short note on the trade-offs. "
         "\n\nCode/Task:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["pagination"], func=is_allowed)
@@ -1433,7 +1433,7 @@ def cmd_pagination(message):
         "cursor) and give a concise code example. Reply with only the answer — no preamble. "
         "\n\nRequirement:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["migration"], func=is_allowed)
@@ -1452,7 +1452,7 @@ def cmd_migration(message):
         "the migration in a code block — no preamble. "
         "\n\nChange:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["mock"], func=is_allowed)
@@ -1471,7 +1471,7 @@ def cmd_mock(message):
         "code block — no preamble. "
         "\n\nMock:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["fixture"], func=is_allowed)
@@ -1490,7 +1490,7 @@ def cmd_fixture(message):
         "usage. "
         "\n\nSetup:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["decorator"], func=is_allowed)
@@ -1509,7 +1509,7 @@ def cmd_decorator(message):
         "a code block — no preamble. "
         "\n\nBehavior:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["async"], func=is_allowed)
@@ -1528,7 +1528,7 @@ def cmd_async(message):
         "in a code block, plus one short note. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["memoize"], func=is_allowed)
@@ -1547,7 +1547,7 @@ def cmd_memoize(message):
         "block, plus one short note on cache invalidation. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["solid"], func=is_allowed)
@@ -1566,7 +1566,7 @@ def cmd_solid(message):
         "answer — no preamble. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["dry"], func=is_allowed)
@@ -1585,7 +1585,7 @@ def cmd_dry(message):
         "Reply with only the answer — no preamble. "
         "\n\nCode:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["pr"], func=is_allowed)
@@ -1604,7 +1604,7 @@ def cmd_pr(message):
         "Markdown — no preamble. "
         "\n\nChange:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["cli"], func=is_allowed)
@@ -1623,7 +1623,7 @@ def cmd_cli(message):
         "Reply with only the code in a code block — no preamble. "
         "\n\nTool:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["middleware"], func=is_allowed)
@@ -1642,7 +1642,7 @@ def cmd_middleware(message):
         "short note on where to register it. "
         "\n\nBehavior:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["webhook"], func=is_allowed)
@@ -1661,7 +1661,7 @@ def cmd_webhook(message):
         "code block, plus one short note. "
         "\n\nEvent:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["semver"], func=is_allowed)
@@ -1680,7 +1680,7 @@ def cmd_semver(message):
         "sentences. Reply with only the answer — no preamble. "
         "\n\nDetails:\n" + arg,
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 # --- Text & developer utilities (no AI call needed) -------------------------
@@ -2539,7 +2539,7 @@ def _grade_quiz(message, question):
         "Say whether the answer is correct, then give the correct answer with a one-sentence "
         "explanation. Be encouraging and concise.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["summarize"], func=is_allowed)
@@ -2554,7 +2554,7 @@ def cmd_summarize(message):
         "paragraph or a few bullet points. Do not add opinions or information that isn't "
         f"in the text. Reply with only the summary — no preamble.\n\nText:\n{text}",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["roll"], func=is_allowed)
@@ -2581,7 +2581,7 @@ def _do_roast(message):
         "but keep it clever comedy (no slurs, no protected-class attacks, nothing genuinely hateful). "
         "Keep it to 1-3 punchy lines. Reply with only the roast — no preamble, no disclaimers.",
     )
-    bot.send_message(message.chat.id, reply)
+    send_reply(message, reply)
 
 
 @bot.message_handler(commands=["remember"], func=is_allowed)

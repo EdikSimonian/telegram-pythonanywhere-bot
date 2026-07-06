@@ -121,14 +121,16 @@ def test_handle_message_mention_only_skipped():
 def test_cmd_debug_calls_ask_ai_with_code():
     with (
         patch("bot.handlers.ask_ai", return_value="Fixed") as mock_ask,
-        patch("bot.handlers.bot") as mock_bot,
+        patch("bot.handlers.send_reply") as mock_send,
+        patch("bot.handlers.bot"),
     ):
         from bot.handlers import cmd_debug
 
         cmd_debug(make_message(text="/debug print(x"))
         prompt = mock_ask.call_args[0][1]
         assert "print(x" in prompt
-        mock_bot.send_message.assert_called_once_with(456, "Fixed")
+        # replies go through send_reply (splits long code, renders Markdown)
+        assert mock_send.call_args[0][1] == "Fixed"
 
 
 def test_cmd_debug_no_code_shows_usage():
@@ -146,14 +148,15 @@ def test_cmd_debug_no_code_shows_usage():
 def test_cmd_review_calls_ask_ai_with_code():
     with (
         patch("bot.handlers.ask_ai", return_value="Looks good") as mock_ask,
-        patch("bot.handlers.bot") as mock_bot,
+        patch("bot.handlers.send_reply") as mock_send,
+        patch("bot.handlers.bot"),
     ):
         from bot.handlers import cmd_review
 
         cmd_review(make_message(text="/review def f(): pass"))
         prompt = mock_ask.call_args[0][1]
         assert "def f(): pass" in prompt
-        mock_bot.send_message.assert_called_once_with(456, "Looks good")
+        assert mock_send.call_args[0][1] == "Looks good"
 
 
 def test_cmd_review_no_code_shows_usage():
@@ -200,7 +203,8 @@ def test_cmd_quiz_no_topic_shows_usage():
 def test_grade_quiz_scores_answer_with_question_context():
     with (
         patch("bot.handlers.ask_ai", return_value="Correct!") as mock_ask,
-        patch("bot.handlers.bot") as mock_bot,
+        patch("bot.handlers.send_reply") as mock_send,
+        patch("bot.handlers.bot"),
     ):
         from bot.handlers import _grade_quiz
 
@@ -208,7 +212,7 @@ def test_grade_quiz_scores_answer_with_question_context():
         prompt = mock_ask.call_args[0][1]
         assert "What is a list?" in prompt
         assert "a list is ordered" in prompt
-        mock_bot.send_message.assert_called_once_with(456, "Correct!")
+        assert mock_send.call_args[0][1] == "Correct!"
 
 
 def test_grade_quiz_empty_answer_cancels():
@@ -231,14 +235,15 @@ def test_grade_quiz_empty_answer_cancels():
 def test_cmd_summarize_calls_ask_ai_with_text():
     with (
         patch("bot.handlers.ask_ai", return_value="Short summary") as mock_ask,
-        patch("bot.handlers.bot") as mock_bot,
+        patch("bot.handlers.send_reply") as mock_send,
+        patch("bot.handlers.bot"),
     ):
         from bot.handlers import cmd_summarize
 
         cmd_summarize(make_message(text="/summarize a long article about bees"))
         prompt = mock_ask.call_args[0][1]
         assert "a long article about bees" in prompt
-        mock_bot.send_message.assert_called_once_with(456, "Short summary")
+        assert mock_send.call_args[0][1] == "Short summary"
 
 
 def test_cmd_summarize_no_text_shows_usage():
