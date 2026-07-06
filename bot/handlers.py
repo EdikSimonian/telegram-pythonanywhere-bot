@@ -159,18 +159,48 @@ COMMANDS = [
     ("remember", "save a note"),
     ("recall", "list your notes"),
     ("forget", "clear your notes"),
+    ("mermaid", "generate a Mermaid diagram"),
+    ("uml", "describe a UML class diagram"),
+    ("flowchart", "turn a process into a flowchart"),
+    ("benchmark", "write a micro-benchmark for code"),
+    ("graphql", "design a GraphQL schema"),
+    ("openapi", "generate an OpenAPI (Swagger) spec"),
+    ("k8s", "generate a Kubernetes manifest"),
+    ("terraform", "generate Terraform config"),
+    ("nginx", "generate an nginx config"),
+    ("orm", "write ORM model code"),
+    ("auth", "outline authentication for a stack"),
+    ("jwt", "generate JWT auth code"),
+    ("validate", "write input-validation code"),
+    ("logging", "add logging to code"),
+    ("retry", "add retry logic to code"),
+    ("cache", "add caching to code"),
+    ("pagination", "implement pagination"),
+    ("migration", "write a database migration"),
+    ("mock", "generate test mocks/stubs"),
+    ("fixture", "generate test fixtures"),
+    ("decorator", "write a decorator/wrapper"),
+    ("async", "convert code to async"),
+    ("memoize", "add memoization to a function"),
+    ("solid", "refactor toward SOLID"),
+    ("dry", "remove duplicate code (DRY)"),
+    ("pr", "write a pull request description"),
+    ("cli", "build a command-line parser"),
+    ("middleware", "write middleware"),
+    ("webhook", "write a webhook handler"),
+    ("semver", "suggest the next semantic version"),
 ]
 
 
 def command_menu():
     """Full (command, description) list, including the conditional /model
-    command. Shared by /help and Telegram's set_my_commands registration,
-    which accepts at most 100 commands — so the list is capped to fit."""
+    command. This is the *complete* list used by /help. Telegram's
+    set_my_commands "/" autocomplete accepts at most 100 commands, so
+    register_commands() (bot.clients) caps it there — /help still lists
+    everything (send_reply splits it across messages if needed)."""
     cmds = list(COMMANDS)
     if HF_SPACE_ID:
         cmds.append(("model", "switch AI provider"))
-    if len(cmds) > 100:
-        cmds = cmds[:99] + cmds[-1:]  # keep /model, drop one entry to fit the limit
     return cmds
 
 
@@ -1067,6 +1097,575 @@ def cmd_interview(message):
     bot.send_message(message.chat.id, reply)
 
 
+# --- 30 more coding tools (AI) ----------------------------------------------
+
+@bot.message_handler(commands=["mermaid"], func=is_allowed)
+def cmd_mermaid(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /mermaid <description>\nExample: /mermaid login flow for a web app",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Create a Mermaid diagram for the following. Choose the best diagram type (flowchart, "
+        "sequence, class, etc.). Reply with only the Mermaid code in a code block, plus one "
+        "short note. "
+        "\n\nDescribe:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["uml"], func=is_allowed)
+def cmd_uml(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /uml <system>\nExample: /uml an online store with orders and products",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Describe a UML class diagram for the following system. List the classes with their "
+        "key attributes and methods, and the relationships between them. Keep it concise. "
+        "Reply with only the design — no preamble. "
+        "\n\nSystem:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["flowchart"], func=is_allowed)
+def cmd_flowchart(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /flowchart <process>\nExample: /flowchart how a password reset works",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Turn the following process into a clear text flowchart using arrows and simple steps. "
+        "Number the steps and show any branches. Reply with only the flowchart — no preamble. "
+        "\n\nProcess:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["benchmark"], func=is_allowed)
+def cmd_benchmark(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /benchmark <code>\nPaste the code you want benchmarked.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a small, correct micro-benchmark that measures the performance of the following "
+        "code, using the language's standard timing tools. Reply with only the benchmark in a "
+        "code block, plus one short note on how to read the result. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["graphql"], func=is_allowed)
+def cmd_graphql(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /graphql <what it models>\nExample: /graphql a blog with posts and authors",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Design a GraphQL schema (SDL) for the following. Include the main types, queries, and "
+        "mutations. Reply with only the schema in a code block — no preamble. "
+        "\n\nRequirement:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["openapi"], func=is_allowed)
+def cmd_openapi(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /openapi <API>\nExample: /openapi a todo list REST API",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a concise OpenAPI 3 (Swagger) spec in YAML for the following API. Include a "
+        "couple of representative paths with their methods, parameters, and responses. Reply "
+        "with only the YAML in a code block — no preamble. "
+        "\n\nAPI:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["k8s"], func=is_allowed)
+def cmd_k8s(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /k8s <what to deploy>\nExample: /k8s a stateless web app with 3 replicas",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a sensible Kubernetes manifest (YAML) for the following. Use good defaults "
+        "(resource limits, labels, a Service if it fits). Reply with only the YAML in a code "
+        "block, plus one short note. "
+        "\n\nDeploy:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["terraform"], func=is_allowed)
+def cmd_terraform(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /terraform <resource>\nExample: /terraform an AWS S3 bucket with versioning",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write clean Terraform (HCL) for the following. Use sensible defaults and note any "
+        "required variables. Reply with only the Terraform in a code block, plus one short "
+        "note. "
+        "\n\nResource:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["nginx"], func=is_allowed)
+def cmd_nginx(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /nginx <need>\nExample: /nginx reverse proxy to a local app on port 8000",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a clean nginx configuration for the following. Include only the relevant "
+        "server/location blocks with good defaults. Reply with only the config in a code "
+        "block, plus one short note. "
+        "\n\nNeed:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["orm"], func=is_allowed)
+def cmd_orm(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /orm <model>\nExample: /orm a User with email and posts (SQLAlchemy)",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write ORM model code for the following. If no ORM is named, pick a common one and say "
+        "which. Include fields, types, and relationships. Reply with only the code in a code "
+        "block, plus one short note. "
+        "\n\nModel:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["auth"], func=is_allowed)
+def cmd_auth(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /auth <stack/need>\nExample: /auth email and password login for a Flask app",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Explain how to implement secure authentication for the following, with the key steps "
+        "and a minimal code sketch. Mention password hashing and session or token handling. "
+        "Keep it concise. Reply with only the answer — no preamble. "
+        "\n\nNeed:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["jwt"], func=is_allowed)
+def cmd_jwt(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /jwt <stack>\nExample: /jwt issue and verify a JWT in Node.js",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write minimal, correct code to issue and verify a JSON Web Token for the following "
+        "stack. Note the secret and expiry handling. Reply with only the code in a code block, "
+        "plus one short note. "
+        "\n\nStack:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["validate"], func=is_allowed)
+def cmd_validate(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /validate <what to validate>\nExample: /validate a signup form (email, password)",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write clear input-validation code for the following. Check the important constraints "
+        "and return helpful errors. Pick a sensible language or library if none is given. "
+        "Reply with only the code in a code block — no preamble. "
+        "\n\nValidate:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["logging"], func=is_allowed)
+def cmd_logging(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /logging <code>\nPaste the code you want logging added to.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Add sensible, idiomatic logging to the following code (useful levels and messages, no "
+        "noisy spam) without changing its behavior. Reply with only the updated code in a code "
+        "block, plus one short note. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["retry"], func=is_allowed)
+def cmd_retry(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /retry <code>\nPaste the code you want retry logic for.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Add robust retry logic with exponential backoff to the following code, retrying only "
+        "on transient errors. Keep behavior otherwise identical. Reply with only the updated "
+        "code in a code block, plus one short note. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["cache"], func=is_allowed)
+def cmd_cache(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /cache <code or task>\nExample: /cache memoize an expensive function",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Add appropriate caching to the following, choosing a sensible strategy (in-memory, "
+        "memoization, or TTL). Keep correctness. Reply with only the code in a code block, "
+        "plus one short note on the trade-offs. "
+        "\n\nCode/Task:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["pagination"], func=is_allowed)
+def cmd_pagination(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /pagination <what to paginate>\nExample: /pagination a product list in a REST API",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Show how to implement pagination for the following. Cover the approach (offset or "
+        "cursor) and give a concise code example. Reply with only the answer — no preamble. "
+        "\n\nRequirement:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["migration"], func=is_allowed)
+def cmd_migration(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /migration <change>\nExample: /migration add a nullable phone column to users",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a database migration for the following change. Include both the up and down "
+        "steps. Pick a common migration style if none is given and say which. Reply with only "
+        "the migration in a code block — no preamble. "
+        "\n\nChange:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["mock"], func=is_allowed)
+def cmd_mock(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /mock <what to mock>\nExample: /mock an HTTP client used by a service",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write test mocks or stubs for the following, using the language's standard mocking "
+        "approach. Show a short example test that uses them. Reply with only the code in a "
+        "code block — no preamble. "
+        "\n\nMock:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["fixture"], func=is_allowed)
+def cmd_fixture(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /fixture <what to set up>\nExample: /fixture a temp database with a seeded user",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write reusable test fixtures for the following setup, using the language's standard "
+        "testing style. Reply with only the code in a code block, plus one short note on "
+        "usage. "
+        "\n\nSetup:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["decorator"], func=is_allowed)
+def cmd_decorator(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /decorator <what it should do>\nExample: /decorator time how long a function takes",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a clean, reusable decorator or wrapper that does the following. Preserve the "
+        "wrapped function's metadata. Show a short usage example. Reply with only the code in "
+        "a code block — no preamble. "
+        "\n\nBehavior:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["async"], func=is_allowed)
+def cmd_async(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /async <code>\nPaste the synchronous code to convert.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Convert the following synchronous code to an idiomatic asynchronous version, keeping "
+        "the same behavior. Note anything callers must change. Reply with only the async code "
+        "in a code block, plus one short note. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["memoize"], func=is_allowed)
+def cmd_memoize(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /memoize <code>\nPaste the function to memoize.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Add memoization to the following function using an idiomatic approach, keeping "
+        "results correct for the same inputs. Reply with only the updated code in a code "
+        "block, plus one short note on cache invalidation. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["solid"], func=is_allowed)
+def cmd_solid(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /solid <code>\nPaste the code you'd like improved.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Refactor the following code toward the SOLID principles. Name which principles you "
+        "applied and why in 1-2 sentences, then show the improved code. Reply with only the "
+        "answer — no preamble. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["dry"], func=is_allowed)
+def cmd_dry(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /dry <code>\nPaste the code with repetition.",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Remove duplication from the following code (DRY) by extracting shared logic, without "
+        "changing behavior. Note what you factored out in one sentence, then show the result. "
+        "Reply with only the answer — no preamble. "
+        "\n\nCode:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["pr"], func=is_allowed)
+def cmd_pr(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /pr <what the change does>\nExample: /pr add rate limiting to the login endpoint",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a clear pull request description for the following change. Include a short "
+        "summary, what changed, and how to test it. Reply with only the description in "
+        "Markdown — no preamble. "
+        "\n\nChange:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["cli"], func=is_allowed)
+def cmd_cli(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /cli <tool>\nExample: /cli a tool that resizes images with --width",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a clean command-line argument parser for the following tool, using the "
+        "language's standard library. Include the flags, help text, and a main entry point. "
+        "Reply with only the code in a code block — no preamble. "
+        "\n\nTool:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["middleware"], func=is_allowed)
+def cmd_middleware(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /middleware <what it does>\nExample: /middleware log request time in Express",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write middleware that does the following, for the framework named (pick a common one "
+        "if none is given and say which). Reply with only the code in a code block, plus one "
+        "short note on where to register it. "
+        "\n\nBehavior:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["webhook"], func=is_allowed)
+def cmd_webhook(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /webhook <event>\nExample: /webhook handle a Stripe payment success event",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Write a concise, secure webhook handler for the following. Verify the signature if "
+        "relevant, parse the payload, and respond correctly. Reply with only the code in a "
+        "code block, plus one short note. "
+        "\n\nEvent:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
+@bot.message_handler(commands=["semver"], func=is_allowed)
+def cmd_semver(message):
+    arg = _arg(message)
+    if not arg:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /semver <version + changes>\nExample: /semver 1.4.2 with a new compatible feature",
+        )
+        return
+    reply = ask_ai(
+        message.from_user.id,
+        "Given the current version and the described changes, state the correct next semantic "
+        "version (MAJOR.MINOR.PATCH) and explain which part bumped and why in one or two "
+        "sentences. Reply with only the answer — no preamble. "
+        "\n\nDetails:\n" + arg,
+    )
+    bot.send_message(message.chat.id, reply)
+
+
 # --- Text & developer utilities (no AI call needed) -------------------------
 
 def _case_words(text):
@@ -1879,7 +2478,9 @@ def cmd_forget(message):
 @bot.message_handler(commands=["help"], func=is_allowed)
 def cmd_help(message):
     lines = [f"/{name} — {desc}" for name, desc in command_menu()]
-    bot.send_message(message.chat.id, "\n".join(lines))
+    # send_reply splits across messages so the full list (now >100
+    # commands) never trips Telegram's 4096-char per-message limit.
+    send_reply(message, "\n".join(lines))
 
 
 @bot.message_handler(commands=["reset"], func=is_allowed)
