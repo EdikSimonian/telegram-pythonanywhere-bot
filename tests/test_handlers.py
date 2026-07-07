@@ -583,3 +583,145 @@ def test_handle_message_uses_keep_typing():
         msg = make_message()
         handle_message(msg)
         mock_keep.assert_called_once_with(456)
+
+
+# ── /edit (image editing) ────────────────────────────────────────────────────
+
+
+def _photo_message(text="", file_id="photo_fid", chat_id=456):
+    """A message carrying a Telegram photo (photo[-1].file_id == file_id)."""
+    msg = MagicMock()
+    msg.text = text
+    msg.from_user.id = 123
+    msg.chat.id = chat_id
+    msg.reply_to_message = None
+    photo = MagicMock()
+    photo.file_id = file_id
+    msg.photo = [photo]
+    msg.document = None
+    return msg
+
+
+def test_cmd_edit_no_prompt_shows_usage():
+    with patch("bot.handlers.bot") as mock_bot:
+        from bot.handlers import cmd_edit
+
+        cmd_edit(make_message(text="/edit"))
+        mock_bot.register_next_step_handler.assert_not_called()
+        assert "Usage" in mock_bot.send_message.call_args[0][1]
+
+
+def test_cmd_edit_asks_for_image_and_registers_next_step():
+    with patch("bot.handlers.bot") as mock_bot:
+        from bot.handlers import cmd_edit, _do_edit
+
+        sent = MagicMock()
+        mock_bot.send_message.return_value = sent
+        # make_message sets reply_to_message = None, so no one-step flow.
+        cmd_edit(make_message(text="/edit make the sky a sunset"))
+        args = mock_bot.register_next_step_handler.call_args[0]
+        assert args[0] is sent
+        assert args[1] is _do_edit
+        assert args[2] == "make the sky a sunset"
+
+
+def test_cmd_edit_reply_to_photo_edits_immediately():
+    """Replying to a photo with '/edit <prompt>' skips the ask-for-image step
+    and edits right away, passing the replied photo's file_id."""
+    with (
+        patch("bot.handlers._do_edit") as mock_do,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_edit
+
+        msg = make_message(text="/edit make it blue")
+        msg.reply_to_message = _photo_message(file_id="src_fid")
+        cmd_edit(msg)
+        mock_bot.register_next_step_handler.assert_not_called()
+        mock_do.assert_called_once_with(msg, "make it blue", "src_fid")
+
+
+def test_do_edit_downloads_source_and_sends_result():
+    with (
+        patch("bot.handlers._edit_image", return_value=b"x" * 2000) as mock_edit,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_edit
+
+        mock_bot.get_file.return_value = MagicMock(file_path="path/to/src.jpg")
+        mock_bot.download_file.return_value = b"source-bytes"
+        _do_edit(make_message(), "make it blue", file_id="fid")
+        mock_bot.get_file.assert_called_once_with("fid")
+        mock_bot.download_file.assert_called_once_with("path/to/src.jpg")
+        # prompt + downloaded bytes are handed to the edit backend
+        assert mock_edit.call_args[0][0] == "make it blue"
+        assert mock_edit.call_args[0][1] == b"source-bytes"
+        assert mock_bot.send_photo.called
+
+
+def test_do_edit_non_image_cancels():
+    with (
+        patch("bot.handlers._edit_image") as mock_edit,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_edit
+
+        msg = make_message()
+        msg.photo = None
+        msg.document = None
+        _do_edit(msg, "make it blue")  # no file_id, nothing attached
+        mock_edit.assert_not_called()
+        assert "wasn't an image" in mock_bot.send_message.call_args[0][1]
+
+
+def test_do_edit_reports_backend_error():
+    with (
+        patch("bot.handlers._edit_image", side_effect=RuntimeError("no backend")),
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_edit
+
+        mock_bot.get_file.return_value = MagicMock(file_path="p")
+        mock_bot.download_file.return_value = b"bytes"
+        _do_edit(make_message(), "make it blue", file_id="fid")
+        assert "Couldn't edit" in mock_bot.send_message.call_args[0][1]
+        assert "no backend" in mock_bot.send_message.call_args[0][1]
+
+
+def test_edit_image_prefers_together():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.TOGETHER_API_KEY", "tk"),
+        patch("bot.handlers._edit_image_together", return_value=b"together") as mock_t,
+        patch("bot.handlers._edit_image_cloudflare") as mock_cf,
+    ):
+        assert bot.handlers._edit_image("p", b"img") == b"together"
+        mock_t.assert_called_once()
+        mock_cf.assert_not_called()
+
+
+def test_edit_image_uses_cloudflare_when_no_together():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.TOGETHER_API_KEY", ""),
+        patch("bot.handlers.CF_ACCOUNT_ID", "acct"),
+        patch("bot.handlers.CF_API_TOKEN", "tok"),
+        patch("bot.handlers._edit_image_cloudflare", return_value=b"cf") as mock_cf,
+    ):
+        assert bot.handlers._edit_image("p", b"img") == b"cf"
+        mock_cf.assert_called_once()
+
+
+def test_edit_image_raises_when_no_backend_configured():
+    import bot.handlers
+    import pytest
+
+    with (
+        patch("bot.handlers.TOGETHER_API_KEY", ""),
+        patch("bot.handlers.CF_ACCOUNT_ID", ""),
+        patch("bot.handlers.CF_API_TOKEN", ""),
+    ):
+        with pytest.raises(RuntimeError):
+            bot.handlers._edit_image("p", b"img")

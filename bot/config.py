@@ -115,6 +115,20 @@ CF_IMAGE_MODEL = os.environ.get(
     "CF_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell"
 ).strip()
 
+# Image editing (image-to-image) for /edit. Editing an existing image needs an
+# img2img-capable backend, so /edit reuses the TOGETHER / CF keys above but a
+# different model: Together AI uses a FLUX.1 Kontext model (takes a source
+# image + instruction), Cloudflare uses a Stable Diffusion img2img model. The
+# keyless pollinations fallback is text-to-image only and can't edit, so /edit
+# is unavailable when neither TOGETHER_API_KEY nor CF_ACCOUNT_ID+CF_API_TOKEN
+# is set. Override these only if your key can access a different model.
+TOGETHER_EDIT_MODEL = os.environ.get(
+    "TOGETHER_EDIT_MODEL", "black-forest-labs/FLUX.1-kontext-dev"
+).strip()
+CF_EDIT_MODEL = os.environ.get(
+    "CF_EDIT_MODEL", "@cf/runwayml/stable-diffusion-v1-5-img2img"
+).strip()
+
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
 # stateless mode: history / rate limiting / preferences / dedupe all
 # degrade gracefully (the consumer modules in bot/ check `store is

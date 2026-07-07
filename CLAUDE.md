@@ -90,6 +90,8 @@ telegram-pythonanywhere-bot/
 | `TOGETHER_IMAGE_MODEL` | No | `black-forest-labs/FLUX.1-schnell-Free` | Together model id used by `/image` |
 | `CF_ACCOUNT_ID` / `CF_API_TOKEN` | No | — | Cloudflare Workers AI — another free `/image` backend (`api.cloudflare.com` is allowlisted). When both are set (and `TOGETHER_API_KEY` isn't), `/image` uses Cloudflare. Token needs the "Workers AI" permission |
 | `CF_IMAGE_MODEL` | No | `@cf/black-forest-labs/flux-1-schnell` | Cloudflare Workers AI model id used by `/image` |
+| `TOGETHER_EDIT_MODEL` | No | `black-forest-labs/FLUX.1-kontext-dev` | Together AI model used by `/edit` (image-to-image). Must be a Kontext / img2img-capable model — the default `/image` model can't edit. Used when `TOGETHER_API_KEY` is set |
+| `CF_EDIT_MODEL` | No | `@cf/runwayml/stable-diffusion-v1-5-img2img` | Cloudflare Workers AI img2img model used by `/edit` when `CF_ACCOUNT_ID` + `CF_API_TOKEN` are set (and `TOGETHER_API_KEY` isn't) |
 | `WEBHOOK_SECRET` | No | _auto-generated_ | Random string Telegram echoes back in `X-Telegram-Bot-Api-Secret-Token`. Auto-bootstrapped on first run: if the env var is unset, `bot/config.py::_bootstrap_webhook_secret()` generates a 64-hex secret, persists it to `.webhook_secret` (gitignored, mode 0600), and reuses it on subsequent boots. The boot-time `register_webhook()` then ships it to Telegram. Set the env var to override / share across envs |
 | `WEBHOOK_URL` | No | — | When set, the bot auto-registers this URL as the Telegram webhook on every worker boot and after every `/api/deploy`. No manual `setWebhook` step needed. Idempotent. On PA, value is `https://<your-pa-username>.pythonanywhere.com/api/webhook`. Leave unset for local polling |
 | `RATE_LIMIT` | No | `250` | Max messages per user per day |
@@ -145,6 +147,11 @@ To switch to a different HF space, change `HF_SPACE_ID` and confirm the target s
 **PA outbound-whitelist caveat for HF Spaces.** `gradio_client` first fetches the space config from `huggingface.co` (whitelisted) and then routes `predict()` calls to `<space-subdomain>.hf.space` (NOT explicitly whitelisted as of last check). If `/model hf` hangs or 403s on PA but works locally, that's almost certainly the cause — verify with `curl -I https://<space>.hf.space/` from a PA Bash console, and if blocked, request `*.hf.space` on the PA forum whitelist thread. `bot/providers.py::_call_hf` passes `httpx_kwargs={"timeout": HF_REQUEST_TIMEOUT}` so a blocked subdomain fails fast instead of wedging the worker.
 
 ---
+
+## Image commands
+
+- **`/image <prompt>`** — text-to-image. `_generate_image()` in `bot/handlers.py` picks the first configured backend: Together AI → Cloudflare Workers AI → keyless pollinations.ai (the zero-config fallback). All three are free-tier friendly.
+- **`/edit <instruction>`** — image-to-image (the AI edits an existing image). Two ways to use it: reply to a photo/image with `/edit <instruction>` (one step), or send `/edit <instruction>` and then send the image (two steps, mirrors `/convert` via `register_next_step_handler`). Both a photo and an image *document* are accepted (`_image_file_id()`); sending as a file preserves quality. `_edit_image()` dispatches to Together AI (a FLUX.1 Kontext model, source image passed inline as a base64 data URI — no public URL needed) or Cloudflare Workers AI (a Stable Diffusion img2img model). **There is no keyless fallback for `/edit`:** pollinations only does text-to-image, so when neither `TOGETHER_API_KEY` nor `CF_ACCOUNT_ID`+`CF_API_TOKEN` is set, `/edit` returns a clear "not configured" message instead of silently failing. Edit models are separate from `/image` models (`TOGETHER_EDIT_MODEL` / `CF_EDIT_MODEL`) because the default generate models can't edit.
 
 ## Webhook verification
 

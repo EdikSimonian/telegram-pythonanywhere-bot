@@ -17,6 +17,7 @@ from bot.config import (
     ALT_CEREBRAS_MODELS,
     CF_ACCOUNT_ID,
     CF_API_TOKEN,
+    CF_EDIT_MODEL,
     CF_IMAGE_MODEL,
     COMMIT_SHA,
     HF_SPACE_ID,
@@ -24,6 +25,7 @@ from bot.config import (
     MODEL,
     RATE_LIMIT,
     TOGETHER_API_KEY,
+    TOGETHER_EDIT_MODEL,
     TOGETHER_IMAGE_MODEL,
 )
 from bot.ai import ask_ai
@@ -159,6 +161,7 @@ COMMANDS = [
     ("pick", "pick a random option"),
     ("coin", "flip a coin"),
     ("image", "generate an image from a prompt"),
+    ("edit", "edit an image with an instruction"),
     ("qr", "generate a QR code image"),
     ("shorten", "shorten a URL"),
     ("weather", "current weather for a city"),
@@ -2277,6 +2280,153 @@ def cmd_image(message):
     except Exception:
         buf.seek(0)  # fall back to sending it as a file
         bot.send_document(message.chat.id, buf, visible_file_name="image.jpg")
+
+
+# --- Image editing for /edit ------------------------------------------------
+# Where /image is text -> image, /edit is (image + instruction) -> image. That
+# needs an img2img backend: Together AI (a FLUX.1 Kontext model) or Cloudflare
+# Workers AI (a Stable Diffusion img2img model). The keyless pollinations
+# service only does text-to-image, so /edit has no keyless fallback — it tells
+# the user to configure a backend when neither key is set.
+
+def _edit_image_together(prompt, image_bytes):
+    """Edit an image via Together AI's FLUX.1 Kontext model. The source image is
+    passed inline as a base64 data URI so we never need a public URL for the
+    upload (important on PA, where the bot has no public file host)."""
+    import requests
+
+    data_uri = "data:image/png;base64," + base64.b64encode(image_bytes).decode("ascii")
+    resp = requests.post(
+        "https://api.together.xyz/v1/images/generations",
+        headers={"Authorization": f"Bearer {TOGETHER_API_KEY}"},
+        json={
+            "model": TOGETHER_EDIT_MODEL,
+            "prompt": prompt,
+            "image_url": data_uri,
+            "n": 1,
+            "response_format": "b64_json",
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    items = resp.json().get("data") or []
+    if not items:
+        raise RuntimeError("the image service returned no image")
+    item = items[0]
+    if item.get("b64_json"):
+        data = base64.b64decode(item["b64_json"])
+    elif item.get("url"):
+        data = _http_get_bytes(item["url"], timeout=120)
+    else:
+        raise RuntimeError("the image service returned no image data")
+    if not data or len(data) < 1000:  # too small to be a real image
+        raise RuntimeError("the image service returned no image")
+    return data
+
+
+def _edit_image_cloudflare(prompt, image_bytes):
+    """Edit an image via Cloudflare Workers AI's img2img model. Workers AI wants
+    the source image as an array of byte values (0-255); the response is JSON
+    with a base64 image or raw bytes, same as the generate path."""
+    import requests
+
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{CF_EDIT_MODEL}"
+    resp = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {CF_API_TOKEN}"},
+        json={"prompt": prompt, "image": list(image_bytes)},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    if "application/json" in resp.headers.get("content-type", ""):
+        result = resp.json().get("result") or {}
+        b64 = result.get("image")
+        data = base64.b64decode(b64) if b64 else b""
+    else:
+        data = resp.content
+    if not data or len(data) < 1000:  # too small to be a real image
+        raise RuntimeError("the image service returned no image")
+    return data
+
+
+def _edit_image(prompt, image_bytes):
+    """Pick the first configured edit-capable backend. Unlike _generate_image
+    there is no keyless fallback — editing an existing image needs a real
+    img2img backend, so raise a clear message when none is configured."""
+    if TOGETHER_API_KEY:
+        return _edit_image_together(prompt, image_bytes)
+    if CF_ACCOUNT_ID and CF_API_TOKEN:
+        return _edit_image_cloudflare(prompt, image_bytes)
+    raise RuntimeError(
+        "image editing isn't configured on this bot. It needs an img2img "
+        "backend — set TOGETHER_API_KEY or CF_ACCOUNT_ID + CF_API_TOKEN. "
+        "(The keyless image service can only create new images, not edit them.)"
+    )
+
+
+def _image_file_id(message):
+    """Return a downloadable file_id for an image attached to `message`, or
+    None. Accepts both Telegram photos and image documents (files sent to keep
+    original quality)."""
+    if message is None:
+        return None
+    if getattr(message, "photo", None):
+        return message.photo[-1].file_id
+    doc = getattr(message, "document", None)
+    if doc is not None and (getattr(doc, "mime_type", "") or "").startswith("image/"):
+        return doc.file_id
+    return None
+
+
+@bot.message_handler(commands=["edit"], func=is_allowed)
+def cmd_edit(message):
+    prompt = _arg(message)
+    if not prompt:
+        bot.send_message(
+            message.chat.id,
+            "Usage: /edit <what to change>, then send the image.\n"
+            "Or reply to an image with /edit <what to change>.\n"
+            "Example: /edit make the sky a sunset",
+        )
+        return
+    # One-step flow: reply to a photo/image with "/edit <prompt>".
+    replied_file_id = _image_file_id(getattr(message, "reply_to_message", None))
+    if replied_file_id:
+        _do_edit(message, prompt, replied_file_id)
+        return
+    # Two-step flow (mirrors /convert): ask for the image, edit on arrival.
+    sent = bot.send_message(
+        message.chat.id,
+        "Now send me the image to edit.\n"
+        "Tip: send it as a file (not a photo) to keep the original quality.",
+    )
+    bot.register_next_step_handler(sent, _do_edit, prompt)
+
+
+def _do_edit(message, prompt, file_id=None):
+    if file_id is None:
+        file_id = _image_file_id(message)
+    if not file_id:
+        bot.send_message(message.chat.id, "That wasn't an image — edit cancelled.")
+        return
+    try:
+        bot.send_chat_action(message.chat.id, "upload_photo")
+    except Exception:
+        pass
+    try:
+        info = bot.get_file(file_id)
+        source = bot.download_file(info.file_path)
+        data = _edit_image(prompt, source)
+    except Exception as e:
+        bot.send_message(message.chat.id, f"Couldn't edit that image: {e}")
+        return
+    buf = io.BytesIO(data)
+    buf.name = "edited.jpg"
+    try:
+        bot.send_photo(message.chat.id, buf, caption=prompt[:1000])
+    except Exception:
+        buf.seek(0)  # fall back to sending it as a file
+        bot.send_document(message.chat.id, buf, visible_file_name="edited.jpg")
 
 
 # --- More free/keyless helpers (QR, URL shortener, weather, dictionary) ------
