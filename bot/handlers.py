@@ -2384,8 +2384,10 @@ def cmd_edit(message):
     if not prompt:
         bot.send_message(
             message.chat.id,
-            "Usage: /edit <what to change>, then send the image.\n"
-            "Or reply to an image with /edit <what to change>.\n"
+            "Usage — three ways to edit an image:\n"
+            "1. Send a photo with the caption /edit <what to change>\n"
+            "2. Reply to a photo with /edit <what to change>\n"
+            "3. Send /edit <what to change>, then send the photo\n"
             "Example: /edit make the sky a sunset",
         )
         return
@@ -2403,6 +2405,40 @@ def cmd_edit(message):
     bot.register_next_step_handler(sent, _do_edit, prompt)
 
 
+def _edit_command_in_caption(message):
+    """True when a photo/document arrives captioned with the /edit command
+    (optionally /edit@botname). Lets users attach an image and type the edit
+    instruction in the caption — the most natural gesture — which telebot's
+    command handler otherwise misses because it only matches text, not
+    captions."""
+    cap = (getattr(message, "caption", "") or "").strip()
+    if not cap.startswith("/"):
+        return False
+    cmd = cap.split(maxsplit=1)[0].lstrip("/").split("@")[0].lower()
+    return cmd == "edit" and is_allowed(message)
+
+
+@bot.message_handler(content_types=["photo", "document"], func=_edit_command_in_caption)
+def cmd_edit_caption(message):
+    parts = (message.caption or "").strip().split(maxsplit=1)
+    prompt = parts[1].strip() if len(parts) > 1 else ""
+    file_id = _image_file_id(message)
+    if not file_id:
+        bot.send_message(
+            message.chat.id,
+            "Send a photo or image file with the caption /edit <what to change>.",
+        )
+        return
+    if not prompt:
+        bot.send_message(
+            message.chat.id,
+            "Add the change after /edit — e.g. caption the image "
+            "'/edit make the sky a sunset'.",
+        )
+        return
+    _do_edit(message, prompt, file_id)
+
+
 def _do_edit(message, prompt, file_id=None):
     if file_id is None:
         file_id = _image_file_id(message)
@@ -2418,6 +2454,7 @@ def _do_edit(message, prompt, file_id=None):
         source = bot.download_file(info.file_path)
         data = _edit_image(prompt, source)
     except Exception as e:
+        print(f"Error in _do_edit: {e}")  # surface backend failures in the PA log
         bot.send_message(message.chat.id, f"Couldn't edit that image: {e}")
         return
     buf = io.BytesIO(data)

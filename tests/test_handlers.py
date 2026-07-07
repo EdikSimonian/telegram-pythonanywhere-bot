@@ -688,6 +688,49 @@ def test_do_edit_reports_backend_error():
         assert "no backend" in mock_bot.send_message.call_args[0][1]
 
 
+def test_edit_command_in_caption_detects_edit():
+    import bot.handlers
+
+    with patch("bot.handlers.is_allowed", return_value=True):
+        yes = MagicMock(caption="/edit make it blue")
+        no1 = MagicMock(caption="/image a cat")
+        no2 = MagicMock(caption="just a photo")
+        atbot = MagicMock(caption="/edit@testbot make it blue")
+        assert bot.handlers._edit_command_in_caption(yes) is True
+        assert bot.handlers._edit_command_in_caption(atbot) is True
+        assert bot.handlers._edit_command_in_caption(no1) is False
+        assert bot.handlers._edit_command_in_caption(no2) is False
+
+
+def test_cmd_edit_caption_edits_photo_with_caption():
+    """A photo captioned '/edit <prompt>' should edit immediately, passing the
+    photo's file_id — the gesture telebot's command matcher misses."""
+    with (
+        patch("bot.handlers._do_edit") as mock_do,
+        patch("bot.handlers.bot"),
+    ):
+        from bot.handlers import cmd_edit_caption
+
+        msg = _photo_message(file_id="cap_fid")
+        msg.caption = "/edit make it blue"
+        cmd_edit_caption(msg)
+        mock_do.assert_called_once_with(msg, "make it blue", "cap_fid")
+
+
+def test_cmd_edit_caption_no_prompt_shows_hint():
+    with (
+        patch("bot.handlers._do_edit") as mock_do,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import cmd_edit_caption
+
+        msg = _photo_message(file_id="cap_fid")
+        msg.caption = "/edit"
+        cmd_edit_caption(msg)
+        mock_do.assert_not_called()
+        assert "/edit" in mock_bot.send_message.call_args[0][1]
+
+
 def test_edit_image_prefers_together():
     import bot.handlers
 
