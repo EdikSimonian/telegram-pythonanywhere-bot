@@ -2384,7 +2384,7 @@ def _edit_image_hf(prompt, image_bytes):
         tmp.close()
         client = Client(
             HF_EDIT_SPACE,
-            hf_token=(HF_TOKEN or None),
+            token=(HF_TOKEN or None),
             httpx_kwargs={"timeout": HF_EDIT_TIMEOUT},
         )
         result = client.predict(
