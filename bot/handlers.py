@@ -20,7 +20,12 @@ from bot.config import (
     CF_EDIT_MODEL,
     CF_IMAGE_MODEL,
     COMMIT_SHA,
+    HF_EDIT_GUIDANCE,
+    HF_EDIT_SPACE,
+    HF_EDIT_STEPS,
+    HF_EDIT_TIMEOUT,
     HF_SPACE_ID,
+    HF_TOKEN,
     HOSTING_LABEL,
     MODEL,
     RATE_LIMIT,
@@ -2349,18 +2354,88 @@ def _edit_image_cloudflare(prompt, image_bytes):
     return data
 
 
+def _to_telegram_image(data):
+    """Normalize edited image bytes to PNG. FLUX Kontext Spaces return WebP,
+    which Telegram's send_photo can reject; re-encode via Pillow when it's
+    available, otherwise fall back to the original bytes."""
+    try:
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(data))
+        out = io.BytesIO()
+        img.save(out, format="PNG")
+        return out.getvalue()
+    except Exception:
+        return data
+
+
+def _edit_image_hf(prompt, image_bytes):
+    """FREE, high-quality editing via a Hugging Face Space running FLUX.1
+    Kontext (a true instruction editor). gradio_client uploads the source image
+    to the Space directly, so no public URL or bot-token leak is needed.
+    hf.space + huggingface.co are on PA's allowlist. The Space is a shared free
+    GPU, so this can queue for ~30-60s or be briefly unavailable."""
+    import tempfile
+    from gradio_client import Client, handle_file
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(image_bytes)
+        tmp.close()
+        client = Client(
+            HF_EDIT_SPACE,
+            hf_token=(HF_TOKEN or None),
+            httpx_kwargs={"timeout": HF_EDIT_TIMEOUT},
+        )
+        result = client.predict(
+            input_image=handle_file(tmp.name),
+            prompt=prompt,
+            seed=0,
+            randomize_seed=True,
+            guidance_scale=HF_EDIT_GUIDANCE,
+            steps=HF_EDIT_STEPS,
+            api_name="/infer",
+        )
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+    # /infer returns (edited_image, seed); the image is a local path (str) or a
+    # {path|url} dict depending on the gradio version.
+    out = result[0] if isinstance(result, (list, tuple)) else result
+    if isinstance(out, dict):
+        out = out.get("path") or out.get("url")
+    if not out:
+        raise RuntimeError("the edit service returned no image")
+    if isinstance(out, str) and out.startswith("http"):
+        data = _http_get_bytes(out, timeout=HF_EDIT_TIMEOUT)
+    else:
+        with open(out, "rb") as f:
+            data = f.read()
+    if not data or len(data) < 1000:  # too small to be a real image
+        raise RuntimeError("the edit service returned no image")
+    return _to_telegram_image(data)
+
+
 def _edit_image(prompt, image_bytes):
-    """Pick the first configured edit-capable backend. Unlike _generate_image
-    there is no keyless fallback — editing an existing image needs a real
-    img2img backend, so raise a clear message when none is configured."""
+    """Pick the first configured edit-capable backend. Prefers free FLUX.1
+    Kontext (a Hugging Face Space) for true instruction-based editing, then the
+    OpenAI-compatible img2img backends. Unlike _generate_image there is no
+    keyless *text-to-image* fallback — editing needs a real edit backend — so
+    raise a clear message when none is configured."""
+    if HF_EDIT_SPACE:
+        return _edit_image_hf(prompt, image_bytes)
     if TOGETHER_API_KEY:
         return _edit_image_together(prompt, image_bytes)
     if CF_ACCOUNT_ID and CF_API_TOKEN:
         return _edit_image_cloudflare(prompt, image_bytes)
     raise RuntimeError(
-        "image editing isn't configured on this bot. It needs an img2img "
-        "backend — set TOGETHER_API_KEY or CF_ACCOUNT_ID + CF_API_TOKEN. "
-        "(The keyless image service can only create new images, not edit them.)"
+        "image editing isn't configured on this bot. It needs an edit backend "
+        "— set HF_EDIT_SPACE (free FLUX.1 Kontext), TOGETHER_API_KEY, or "
+        "CF_ACCOUNT_ID + CF_API_TOKEN. (The keyless image service can only "
+        "create new images, not edit them.)"
     )
 
 
@@ -2452,7 +2527,9 @@ def _do_edit(message, prompt, file_id=None):
     try:
         info = bot.get_file(file_id)
         source = bot.download_file(info.file_path)
-        data = _edit_image(prompt, source)
+        # Kontext on a free GPU can take ~30-60s; keep the indicator alive.
+        with keep_typing(message.chat.id):
+            data = _edit_image(prompt, source)
     except Exception as e:
         print(f"Error in _do_edit: {e}")  # surface backend failures in the PA log
         bot.send_message(message.chat.id, f"Couldn't edit that image: {e}")

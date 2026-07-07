@@ -731,10 +731,27 @@ def test_cmd_edit_caption_no_prompt_shows_hint():
         assert "/edit" in mock_bot.send_message.call_args[0][1]
 
 
-def test_edit_image_prefers_together():
+def test_edit_image_prefers_hf_kontext():
+    """Free FLUX.1 Kontext (an HF Space) is the preferred /edit backend."""
     import bot.handlers
 
     with (
+        patch("bot.handlers.HF_EDIT_SPACE", "black-forest-labs/FLUX.1-Kontext-Dev"),
+        patch("bot.handlers._edit_image_hf", return_value=b"kontext") as mock_hf,
+        patch("bot.handlers._edit_image_together") as mock_t,
+        patch("bot.handlers._edit_image_cloudflare") as mock_cf,
+    ):
+        assert bot.handlers._edit_image("p", b"img") == b"kontext"
+        mock_hf.assert_called_once()
+        mock_t.assert_not_called()
+        mock_cf.assert_not_called()
+
+
+def test_edit_image_prefers_together_when_no_hf():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.HF_EDIT_SPACE", ""),
         patch("bot.handlers.TOGETHER_API_KEY", "tk"),
         patch("bot.handlers._edit_image_together", return_value=b"together") as mock_t,
         patch("bot.handlers._edit_image_cloudflare") as mock_cf,
@@ -744,10 +761,11 @@ def test_edit_image_prefers_together():
         mock_cf.assert_not_called()
 
 
-def test_edit_image_uses_cloudflare_when_no_together():
+def test_edit_image_uses_cloudflare_when_no_hf_or_together():
     import bot.handlers
 
     with (
+        patch("bot.handlers.HF_EDIT_SPACE", ""),
         patch("bot.handlers.TOGETHER_API_KEY", ""),
         patch("bot.handlers.CF_ACCOUNT_ID", "acct"),
         patch("bot.handlers.CF_API_TOKEN", "tok"),
@@ -762,6 +780,7 @@ def test_edit_image_raises_when_no_backend_configured():
     import pytest
 
     with (
+        patch("bot.handlers.HF_EDIT_SPACE", ""),
         patch("bot.handlers.TOGETHER_API_KEY", ""),
         patch("bot.handlers.CF_ACCOUNT_ID", ""),
         patch("bot.handlers.CF_API_TOKEN", ""),

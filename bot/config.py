@@ -129,6 +129,25 @@ CF_EDIT_MODEL = os.environ.get(
     "CF_EDIT_MODEL", "@cf/runwayml/stable-diffusion-v1-5-img2img"
 ).strip()
 
+# FREE image editing via a Hugging Face Space running FLUX.1 Kontext — a true
+# instruction-based editor ("make the sky a sunset" changes only the sky).
+# Preferred /edit backend when HF_EDIT_SPACE is set (it defaults on, so /edit
+# does real Kontext editing out of the box). Called via gradio_client, which
+# uploads the source image straight to the Space (no public URL, no bot-token
+# leak). Both hf.space and huggingface.co are on PA's outbound allowlist, and
+# the Space runs on a free shared GPU (ZeroGPU) — so an edit can queue for
+# ~30-60s or be briefly unavailable. HF_TOKEN (optional, free) raises the
+# ZeroGPU quota for more reliable use; it is reused from the HF provider above.
+HF_EDIT_SPACE = os.environ.get(
+    "HF_EDIT_SPACE", "black-forest-labs/FLUX.1-Kontext-Dev"
+).strip()
+# Generous timeout: gradio_client waits through the queue. Telegram may retry
+# the webhook past ~60s, but dedupe drops the retry and the finished image is
+# still delivered out-of-band via send_photo, so a slow edit isn't lost.
+HF_EDIT_TIMEOUT = int(os.environ.get("HF_EDIT_TIMEOUT", "120"))
+HF_EDIT_STEPS = int(os.environ.get("HF_EDIT_STEPS", "28"))
+HF_EDIT_GUIDANCE = float(os.environ.get("HF_EDIT_GUIDANCE", "2.5"))
+
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
 # stateless mode: history / rate limiting / preferences / dedupe all
 # degrade gracefully (the consumer modules in bot/ check `store is
