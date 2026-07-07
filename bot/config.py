@@ -145,7 +145,12 @@ HF_EDIT_SPACE = os.environ.get(
 # the webhook past ~60s, but dedupe drops the retry and the finished image is
 # still delivered out-of-band via send_photo, so a slow edit isn't lost.
 HF_EDIT_TIMEOUT = int(os.environ.get("HF_EDIT_TIMEOUT", "120"))
-HF_EDIT_STEPS = int(os.environ.get("HF_EDIT_STEPS", "28"))
+# Diffusion steps. Generation time scales ~linearly with this. Benchmarked on
+# the Kontext-Dev Space: 8 steps ~12s, 16 ~19s, 28 ~31s — with little visible
+# quality difference for typical edits. Default 12 is the speed/quality sweet
+# spot; raise it (e.g. 20-28) for more detail, lower (8) for max speed. The
+# shared free GPU's queue wait is separate and not controllable from here.
+HF_EDIT_STEPS = int(os.environ.get("HF_EDIT_STEPS", "12"))
 HF_EDIT_GUIDANCE = float(os.environ.get("HF_EDIT_GUIDANCE", "2.5"))
 
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
