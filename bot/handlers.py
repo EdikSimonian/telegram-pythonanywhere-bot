@@ -9,6 +9,7 @@ import random
 import re
 import secrets
 import string
+import time
 import uuid
 from datetime import datetime, timezone
 from urllib.parse import quote, unquote
@@ -2160,20 +2161,43 @@ def cmd_coin(message):
 # a key it falls back to the keyless pollinations.ai service, which works
 # locally but needs a PA allowlist request to reach image.pollinations.ai.
 
-def _http_get_bytes(url, timeout=120):
+def _http_get_bytes(url, timeout=120, retries=0):
     """GET a URL and return the raw bytes. Uses requests if available (it
-    ships with pyTelegramBotAPI) and falls back to the standard library."""
+    ships with pyTelegramBotAPI) and falls back to the standard library.
+
+    ``retries`` extra attempts are made on HTTP 429 (Too Many Requests) with
+    exponential backoff (1s, 2s, 4s, …). This matters on PythonAnywhere, where
+    the outbound IP is shared, so per-IP-rate-limited free APIs (e.g.
+    open-meteo) can 429 on bursts even when this bot is quiet."""
     headers = {"User-Agent": "coding-assistant-bot/1.0"}
-    try:
-        import requests
-        resp = requests.get(url, timeout=timeout, headers=headers)
-        resp.raise_for_status()
-        return resp.content
-    except ImportError:
-        import urllib.request
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read()
+    for attempt in range(retries + 1):
+        try:
+            try:
+                import requests
+                resp = requests.get(url, timeout=timeout, headers=headers)
+                if resp.status_code == 429 and attempt < retries:
+                    raise _RateLimited()
+                resp.raise_for_status()
+                return resp.content
+            except ImportError:
+                import urllib.error
+                import urllib.request
+                req = urllib.request.Request(url, headers=headers)
+                try:
+                    with urllib.request.urlopen(req, timeout=timeout) as r:
+                        return r.read()
+                except urllib.error.HTTPError as e:
+                    if e.code == 429 and attempt < retries:
+                        raise _RateLimited()
+                    raise
+        except _RateLimited:
+            time.sleep(2 ** attempt)
+    # Unreachable: the loop either returns or raises on the final attempt.
+    raise RuntimeError("request failed after retries")
+
+
+class _RateLimited(Exception):
+    """Internal sentinel: a 429 that we intend to retry."""
 
 
 def _generate_image_together(prompt, width=1024, height=1024):
@@ -2545,8 +2569,8 @@ def _do_edit(message, prompt, file_id=None):
 
 # --- More free/keyless helpers (QR, URL shortener, weather, dictionary) ------
 
-def _http_get_text(url, timeout=30):
-    return _http_get_bytes(url, timeout=timeout).decode("utf-8", "replace")
+def _http_get_text(url, timeout=30, retries=0):
+    return _http_get_bytes(url, timeout=timeout, retries=retries).decode("utf-8", "replace")
 
 
 def _make_qr_png(text):
@@ -2642,6 +2666,7 @@ def cmd_weather(message):
             "https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name="
             + quote(city, safe=""),
             timeout=20,
+            retries=3,
         ))
         results = geo.get("results") or []
         if not results:
@@ -2653,9 +2678,12 @@ def cmd_weather(message):
             f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
             "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
             timeout=20,
+            retries=3,
         ))
     except Exception as e:
-        bot.send_message(message.chat.id, f"Couldn't get the weather: {e}")
+        msg = "the weather service is busy right now — try again in a moment" \
+            if "429" in str(e) else str(e)
+        bot.send_message(message.chat.id, f"Couldn't get the weather: {msg}")
         return
     cur = forecast.get("current") or {}
     if "temperature_2m" not in cur:
