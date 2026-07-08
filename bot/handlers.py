@@ -2298,7 +2298,12 @@ def cmd_image(message):
     if not prompt:
         bot.send_message(
             message.chat.id,
-            "Usage: /image <prompt>\nExample: /image a cozy cabin in a snowy forest at night",
+            "Usage: /image <prompt>\n"
+            "Example: /image a cozy cabin in a snowy forest at night\n"
+            "\n"
+            "📊 What to expect (free tier):\n"
+            "• Speed: usually ready in a few seconds\n"
+            f"• Daily limit: up to {RATE_LIMIT} requests/day (shared with your other messages)",
         )
         return
     try:
@@ -2717,7 +2722,12 @@ def cmd_video(message):
             "    e.g. /video a paper boat sailing down a rainy street\n"
             "• Image → video: send a photo captioned /video <optional motion>,\n"
             "    or reply to a photo with /video <optional motion>\n"
-            "Heads up: on a free GPU a clip can take a minute or more.",
+            "\n"
+            "📊 What to expect (free tier):\n"
+            f"• Clip length: about {int(HF_VIDEO_DURATION)} seconds\n"
+            "• Speed: ~1–2 min per clip on a free shared GPU (be patient)\n"
+            "• Daily limit: only a few clips/day — video runs on Hugging "
+            "Face's free GPU quota, which resets every day",
         )
         return
     # A bare prompt is an unambiguous text-to-video request.
