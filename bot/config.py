@@ -95,16 +95,6 @@ ALT_CEREBRAS_MODELS = [
 # Hugging Face provider (optional) — when set, users can switch via /model
 HF_SPACE_ID = os.environ.get("HF_SPACE_ID", "").strip()
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()  # optional, for private spaces
-# Extra HF tokens for /video quota rotation (comma-separated). When the
-# current token's daily free ZeroGPU quota is exhausted, /video rolls over to
-# the next one, giving roughly N× the free daily video budget. The primary
-# HF_TOKEN is tried first, then these in order. NOTE: creating extra HF
-# accounts solely to exceed the free quota may violate Hugging Face's terms —
-# populate this at your own discretion (it's also useful if you legitimately
-# hold more than one account/org token).
-HF_TOKENS = [
-    t.strip() for t in os.environ.get("HF_TOKENS", "").split(",") if t.strip()
-]
 DEFAULT_PROVIDER = "main"
 
 # Image generation for /image. When TOGETHER_API_KEY is set, /image uses
@@ -162,41 +152,6 @@ HF_EDIT_TIMEOUT = int(os.environ.get("HF_EDIT_TIMEOUT", "120"))
 # shared free GPU's queue wait is separate and not controllable from here.
 HF_EDIT_STEPS = int(os.environ.get("HF_EDIT_STEPS", "12"))
 HF_EDIT_GUIDANCE = float(os.environ.get("HF_EDIT_GUIDANCE", "2.5"))
-
-# FREE video generation for /video via a Hugging Face Space running LTX-Video
-# (a fast distilled text/image-to-video model). Same gradio_client route as
-# /edit — the Space is reached over hf.space (on PA's allowlist) and any source
-# image is uploaded straight to it (no public URL / bot-token leak). The
-# default Space exposes two API endpoints, /text_to_video and /image_to_video,
-# with the same ordered signature. Video is heavier than an image edit, so on
-# the shared free GPU (ZeroGPU) a clip can queue/generate for a minute or more;
-# the finished file is still delivered out-of-band via send_video. Blank
-# HF_VIDEO_SPACE to disable /video (there is no keyless video fallback). To
-# point at a different Space, confirm it exposes the same two api_names and
-# argument order, or adapt bot/handlers.py::_generate_video_hf.
-HF_VIDEO_SPACE = os.environ.get(
-    "HF_VIDEO_SPACE", "Lightricks/ltx-video-distilled"
-).strip()
-# gradio_client timeout (s) — generous, to wait through the ZeroGPU queue.
-HF_VIDEO_TIMEOUT = int(os.environ.get("HF_VIDEO_TIMEOUT", "300"))
-# Clip length in seconds. Longer = slower and more likely to time out; the
-# distilled model is tuned for short clips, so keep this small (~2-4s).
-HF_VIDEO_DURATION = float(os.environ.get("HF_VIDEO_DURATION", "2"))
-HF_VIDEO_GUIDANCE = float(os.environ.get("HF_VIDEO_GUIDANCE", "3.0"))
-# Frame size. Defaults match the Space's own defaults; the model prefers
-# dimensions that are multiples of 32.
-HF_VIDEO_HEIGHT = int(os.environ.get("HF_VIDEO_HEIGHT", "512"))
-HF_VIDEO_WIDTH = int(os.environ.get("HF_VIDEO_WIDTH", "704"))
-# Two-pass "improve texture" render. True ~doubles the GPU seconds per clip
-# (and the free daily ZeroGPU quota it burns) for a modest quality bump.
-# Default False: the fast single-pass path — quicker clips and roughly twice
-# as many per day on the free quota. Set to 1/true for higher quality.
-HF_VIDEO_IMPROVE = os.environ.get("HF_VIDEO_IMPROVE", "").strip().lower() in (
-    "1",
-    "true",
-    "yes",
-    "on",
-)
 
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
 # stateless mode: history / rate limiting / preferences / dedupe all

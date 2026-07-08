@@ -57,21 +57,19 @@ def send_reply(message, text: str) -> None:
 
 
 @contextmanager
-def keep_typing(chat_id: int, action: str = "typing"):
-    """Keep a Telegram chat action alive while the block runs.
+def keep_typing(chat_id: int):
+    """Keep the Telegram "typing" indicator alive while the block runs.
 
-    Spawns a background thread that re-sends the chat action every few
+    Spawns a background thread that re-sends the typing action every few
     seconds until the context exits, then joins the thread before returning
-    so the serverless function can shut down cleanly. ``action`` defaults to
-    "typing"; pass e.g. "upload_video" for long media generations so the user
-    sees the right indicator.
+    so the serverless function can shut down cleanly.
     """
     stop = threading.Event()
 
     def loop():
         while not stop.is_set():
             try:
-                bot.send_chat_action(chat_id, action)
+                bot.send_chat_action(chat_id, "typing")
             except Exception as e:
                 print(f"typing indicator error: {e}")
                 return
