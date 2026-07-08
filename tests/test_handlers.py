@@ -787,3 +787,125 @@ def test_edit_image_raises_when_no_backend_configured():
     ):
         with pytest.raises(RuntimeError):
             bot.handlers._edit_image("p", b"img")
+
+
+# --- /video (text-to-video + image-to-video) -------------------------------
+
+
+def test_cmd_video_no_prompt_shows_usage():
+    with patch("bot.handlers.bot") as mock_bot:
+        from bot.handlers import cmd_video
+
+        cmd_video(make_message(text="/video"))
+        assert "Usage" in mock_bot.send_message.call_args[0][1]
+
+
+def test_cmd_video_bare_prompt_does_text_to_video():
+    """A bare '/video <prompt>' is an unambiguous text-to-video request
+    (file_id None), no image needed."""
+    with (
+        patch("bot.handlers._do_video") as mock_do,
+        patch("bot.handlers.bot"),
+    ):
+        from bot.handlers import cmd_video
+
+        cmd_video(make_message(text="/video a cat surfing a wave"))
+        mock_do.assert_called_once_with(
+            mock_do.call_args[0][0], "a cat surfing a wave", None
+        )
+
+
+def test_cmd_video_reply_to_photo_animates_immediately():
+    """Replying to a photo with '/video <motion>' does image-to-video with the
+    replied photo's file_id."""
+    with (
+        patch("bot.handlers._do_video") as mock_do,
+        patch("bot.handlers.bot"),
+    ):
+        from bot.handlers import cmd_video
+
+        msg = make_message(text="/video make it wave")
+        msg.reply_to_message = _photo_message(file_id="src_fid")
+        cmd_video(msg)
+        mock_do.assert_called_once_with(msg, "make it wave", "src_fid")
+
+
+def test_command_in_caption_detects_video():
+    import bot.handlers
+
+    with patch("bot.handlers.is_allowed", return_value=True):
+        yes = MagicMock(caption="/video make it move")
+        atbot = MagicMock(caption="/video@testbot make it move")
+        no1 = MagicMock(caption="/edit make it blue")
+        no2 = MagicMock(caption="just a photo")
+        assert bot.handlers._command_in_caption(yes, "video") is True
+        assert bot.handlers._command_in_caption(atbot, "video") is True
+        assert bot.handlers._command_in_caption(no1, "video") is False
+        assert bot.handlers._command_in_caption(no2, "video") is False
+
+
+def test_cmd_video_caption_animates_photo_with_caption():
+    with (
+        patch("bot.handlers._do_video") as mock_do,
+        patch("bot.handlers.bot"),
+    ):
+        from bot.handlers import cmd_video_caption
+
+        msg = _photo_message(file_id="cap_fid")
+        msg.caption = "/video make it rain"
+        cmd_video_caption(msg)
+        mock_do.assert_called_once_with(msg, "make it rain", "cap_fid")
+
+
+def test_do_video_text_calls_backend_and_sends_video():
+    with (
+        patch("bot.handlers._generate_video", return_value=b"v" * 2000) as mock_gen,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_video
+
+        _do_video(make_message(), "a paper boat", None)
+        # text-to-video: no source download, image bytes None
+        mock_bot.get_file.assert_not_called()
+        assert mock_gen.call_args[0][0] == "a paper boat"
+        assert mock_gen.call_args[0][1] is None
+        assert mock_bot.send_video.called
+
+
+def test_do_video_image_downloads_source_and_defaults_prompt():
+    """Image-to-video with no words downloads the source and supplies a gentle
+    default motion prompt."""
+    with (
+        patch("bot.handlers._generate_video", return_value=b"v" * 2000) as mock_gen,
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_video
+
+        mock_bot.get_file.return_value = MagicMock(file_path="path/src.jpg")
+        mock_bot.download_file.return_value = b"source-bytes"
+        _do_video(make_message(), "", file_id="fid")
+        mock_bot.download_file.assert_called_once_with("path/src.jpg")
+        assert mock_gen.call_args[0][1] == b"source-bytes"
+        assert mock_gen.call_args[0][0]  # a non-empty default prompt was used
+        assert mock_bot.send_video.called
+
+
+def test_do_video_reports_backend_error():
+    with (
+        patch("bot.handlers._generate_video", side_effect=RuntimeError("gpu busy")),
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_video
+
+        _do_video(make_message(), "a cat", None)
+        assert "Couldn't generate" in mock_bot.send_message.call_args[0][1]
+        assert "gpu busy" in mock_bot.send_message.call_args[0][1]
+
+
+def test_generate_video_raises_when_not_configured():
+    import bot.handlers
+    import pytest
+
+    with patch("bot.handlers.HF_VIDEO_SPACE", ""):
+        with pytest.raises(RuntimeError):
+            bot.handlers._generate_video("a cat")

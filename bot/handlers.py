@@ -27,6 +27,12 @@ from bot.config import (
     HF_EDIT_TIMEOUT,
     HF_SPACE_ID,
     HF_TOKEN,
+    HF_VIDEO_DURATION,
+    HF_VIDEO_GUIDANCE,
+    HF_VIDEO_HEIGHT,
+    HF_VIDEO_SPACE,
+    HF_VIDEO_TIMEOUT,
+    HF_VIDEO_WIDTH,
     HOSTING_LABEL,
     MODEL,
     RATE_LIMIT,
@@ -168,6 +174,7 @@ COMMANDS = [
     ("coin", "flip a coin"),
     ("image", "generate an image from a prompt"),
     ("edit", "edit an image with an instruction"),
+    ("video", "generate a short video from a prompt or photo"),
     ("qr", "generate a QR code image"),
     ("shorten", "shorten a URL"),
     ("define", "define a word"),
@@ -2503,9 +2510,9 @@ def cmd_edit(message):
     bot.register_next_step_handler(sent, _do_edit, prompt)
 
 
-def _edit_command_in_caption(message):
-    """True when a photo/document arrives captioned with the /edit command
-    (optionally /edit@botname). Lets users attach an image and type the edit
+def _command_in_caption(message, name):
+    """True when a photo/document arrives captioned with the /<name> command
+    (optionally /<name>@botname). Lets users attach an image and type the
     instruction in the caption — the most natural gesture — which telebot's
     command handler otherwise misses because it only matches text, not
     captions."""
@@ -2513,7 +2520,11 @@ def _edit_command_in_caption(message):
     if not cap.startswith("/"):
         return False
     cmd = cap.split(maxsplit=1)[0].lstrip("/").split("@")[0].lower()
-    return cmd == "edit" and is_allowed(message)
+    return cmd == name and is_allowed(message)
+
+
+def _edit_command_in_caption(message):
+    return _command_in_caption(message, "edit")
 
 
 @bot.message_handler(content_types=["photo", "document"], func=_edit_command_in_caption)
@@ -2564,6 +2575,166 @@ def _do_edit(message, prompt, file_id=None):
     except Exception:
         buf.seek(0)  # fall back to sending it as a file
         bot.send_document(message.chat.id, buf, visible_file_name="edited.jpg")
+
+
+# --- Video generation for /video -------------------------------------------
+# /video makes a short clip from a text prompt (text-to-video) or animates a
+# photo (image-to-video), both via a free Hugging Face Space running LTX-Video.
+# Same gradio_client route as /edit: reached over hf.space (on PA's allowlist),
+# and any source image is uploaded straight to the Space (no public URL / no
+# bot-token leak). The default Space exposes two endpoints — /text_to_video and
+# /image_to_video — that share one ordered signature. Video is heavier than an
+# image edit, so on the shared free GPU a clip can take a minute or more; it's
+# still delivered out-of-band via send_video. There is no keyless fallback, so
+# /video is unavailable when HF_VIDEO_SPACE is blank.
+
+def _generate_video_hf(prompt, image_bytes=None):
+    """Generate a short video via the HF LTX-Video Space. With image_bytes it
+    does image-to-video (/image_to_video); otherwise text-to-video
+    (/text_to_video). Returns the raw video bytes (an mp4)."""
+    import tempfile
+    from gradio_client import Client, handle_file
+
+    tmp = None
+    try:
+        if image_bytes:
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp.write(image_bytes)
+            tmp.close()
+        client = Client(
+            HF_VIDEO_SPACE,
+            token=(HF_TOKEN or None),
+            httpx_kwargs={"timeout": HF_VIDEO_TIMEOUT},
+        )
+        # Both endpoints share this ordered signature (see the Space's app.py).
+        # Pass positionally so we don't depend on the gradio parameter *names*,
+        # which vary by gradio version.
+        args = [
+            prompt,  # prompt
+            "worst quality, inconsistent motion, blurry, jittery, distorted",  # negative_prompt
+            handle_file(tmp.name) if tmp else None,  # input_image_filepath
+            None,  # input_video_filepath
+            HF_VIDEO_HEIGHT,  # height_ui
+            HF_VIDEO_WIDTH,  # width_ui
+            "image-to-video" if tmp else "text-to-video",  # mode
+            HF_VIDEO_DURATION,  # duration_ui
+            9,  # ui_frames_to_use (video-to-video only)
+            0,  # seed_ui
+            True,  # randomize_seed
+            HF_VIDEO_GUIDANCE,  # ui_guidance_scale
+            True,  # improve_texture_flag
+        ]
+        api_name = "/image_to_video" if tmp else "/text_to_video"
+        result = client.predict(*args, api_name=api_name)
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
+
+    # Returns (video_path, used_seed); the video is a local path (str) or a
+    # {video|path|url} dict depending on the gradio version.
+    out = result[0] if isinstance(result, (list, tuple)) else result
+    if isinstance(out, dict):
+        out = out.get("video") or out.get("path") or out.get("url")
+    if not out:
+        raise RuntimeError("the video service returned no video")
+    if isinstance(out, str) and out.startswith("http"):
+        data = _http_get_bytes(out, timeout=HF_VIDEO_TIMEOUT)
+    else:
+        with open(out, "rb") as f:
+            data = f.read()
+    if not data or len(data) < 1000:  # too small to be a real video
+        raise RuntimeError("the video service returned no video")
+    return data
+
+
+def _generate_video(prompt, image_bytes=None):
+    """Dispatch /video to its only backend (a free HF Space). Raise a clear
+    message when it isn't configured — there is no keyless video fallback."""
+    if not HF_VIDEO_SPACE:
+        raise RuntimeError(
+            "video generation isn't configured on this bot — set HF_VIDEO_SPACE "
+            "to a Hugging Face text/image-to-video Space (default "
+            "Lightricks/ltx-video-distilled)."
+        )
+    return _generate_video_hf(prompt, image_bytes)
+
+
+@bot.message_handler(commands=["video"], func=is_allowed)
+def cmd_video(message):
+    prompt = _arg(message)
+    # Image-to-video: reply to a photo/image with "/video <optional motion>".
+    replied_file_id = _image_file_id(getattr(message, "reply_to_message", None))
+    if replied_file_id:
+        _do_video(message, prompt, replied_file_id)
+        return
+    if not prompt:
+        bot.send_message(
+            message.chat.id,
+            "Usage — make a short video:\n"
+            "• Text → video: /video <prompt>\n"
+            "    e.g. /video a paper boat sailing down a rainy street\n"
+            "• Image → video: send a photo captioned /video <optional motion>,\n"
+            "    or reply to a photo with /video <optional motion>\n"
+            "Heads up: on a free GPU a clip can take a minute or more.",
+        )
+        return
+    # A bare prompt is an unambiguous text-to-video request.
+    _do_video(message, prompt, None)
+
+
+@bot.message_handler(
+    content_types=["photo", "document"],
+    func=lambda m: _command_in_caption(m, "video"),
+)
+def cmd_video_caption(message):
+    parts = (message.caption or "").strip().split(maxsplit=1)
+    prompt = parts[1].strip() if len(parts) > 1 else ""
+    file_id = _image_file_id(message)
+    if not file_id:
+        bot.send_message(
+            message.chat.id,
+            "Send a photo or image file with the caption /video <optional motion>.",
+        )
+        return
+    _do_video(message, prompt, file_id)
+
+
+def _do_video(message, prompt, file_id=None):
+    prompt = (prompt or "").strip()
+    if file_id is not None and not prompt:
+        # Image-to-video with no words: ask for gentle, generic motion.
+        prompt = "animate this image with subtle, natural motion"
+    if file_id is None and not prompt:
+        bot.send_message(
+            message.chat.id, "Add a prompt — e.g. /video a cat surfing a wave."
+        )
+        return
+    try:
+        bot.send_chat_action(message.chat.id, "upload_video")
+    except Exception:
+        pass
+    try:
+        source = None
+        if file_id is not None:
+            info = bot.get_file(file_id)
+            source = bot.download_file(info.file_path)
+        # Video on a free GPU can take a minute+; keep the indicator alive.
+        with keep_typing(message.chat.id, action="upload_video"):
+            data = _generate_video(prompt, source)
+    except Exception as e:
+        print(f"Error in _do_video: {e}")  # surface backend failures in the PA log
+        bot.send_message(message.chat.id, f"Couldn't generate that video: {e}")
+        return
+    buf = io.BytesIO(data)
+    buf.name = "video.mp4"
+    try:
+        bot.send_video(message.chat.id, buf, caption=prompt[:1000])
+    except Exception:
+        buf.seek(0)  # fall back to sending it as a file
+        bot.send_document(message.chat.id, buf, visible_file_name="video.mp4")
 
 
 # --- More free/keyless helpers (QR, URL shortener, dictionary) ------
