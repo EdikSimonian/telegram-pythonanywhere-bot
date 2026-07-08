@@ -78,155 +78,183 @@ def _log(message, direction: str, text: str) -> None:
 # and the Telegram "/" autocomplete menu (registered via set_my_commands
 # in bot.clients.register_commands). Add a new command here when you add
 # its handler, or it won't show up in the menu.
-COMMANDS = [
-    ("start", "welcome message"),
-    ("help", "show this message"),
-    ("reset", "clear conversation history"),
-    ("about", "about this bot"),
-    ("joke", "tell a programming joke"),
-    ("quote", "tell a coding quote"),
-    ("fact", "tell a coding fact"),
-    ("compliment", "give a compliment"),
-    ("motivate", "get a motivational boost"),
-    ("explain", "explain a coding topic"),
-    ("eli5", "explain a topic super simply"),
-    ("analogy", "explain a concept by analogy"),
-    ("cheatsheet", "quick reference for a topic"),
-    ("roadmap", "learning roadmap for a skill"),
-    ("challenge", "get a coding challenge"),
-    ("quiz", "take a quick quiz on a topic"),
-    ("snippet", "generate a code snippet"),
-    ("pseudocode", "write pseudocode for a task"),
-    ("algo", "suggest an algorithm for a problem"),
-    ("api", "design a REST API"),
-    ("schema", "design a database schema"),
-    ("sql", "write a SQL query from a description"),
-    ("regex", "build or explain a regular expression"),
-    ("bash", "write a bash command or script"),
-    ("curl", "build a curl command for an API"),
-    ("cron", "build and explain a cron expression"),
-    ("dockerfile", "generate a Dockerfile for a stack"),
-    ("gitignore", "generate a .gitignore for a stack"),
-    ("ci", "generate a GitHub Actions workflow"),
-    ("explaincode", "explain what a piece of code does"),
-    ("translate", "translate code to another language"),
-    ("debug", "find the bug in your code"),
-    ("error", "explain and fix an error message"),
-    ("review", "get a short code review"),
-    ("lint", "check code for style/lint issues"),
-    ("optimize", "optimize code for speed and clarity"),
-    ("refactor", "restructure code for readability"),
-    ("oneliner", "condense code into a one-liner"),
-    ("types", "add type hints to code"),
-    ("document", "add docstrings and comments to code"),
-    ("test", "generate unit tests for your code"),
-    ("edgecases", "list edge cases to handle"),
-    ("complexity", "analyze time & space complexity"),
-    ("security", "check code for security issues"),
-    ("name", "suggest names for variables/functions"),
-    ("scaffold", "starter project scaffold"),
-    ("design", "high-level system design"),
-    ("pattern", "suggest a design pattern"),
-    ("stack", "recommend a tech stack"),
-    ("readme", "generate a README"),
-    ("makefile", "generate a Makefile"),
-    ("compose", "generate a docker-compose.yml"),
-    ("dotenv", "generate a sample .env"),
-    ("mockdata", "generate mock JSON data"),
-    ("sqlformat", "format a SQL query"),
-    ("regexplain", "explain a regular expression"),
-    ("changelog", "write a changelog entry"),
-    ("userstory", "write a user story"),
-    ("interview", "get an interview question"),
-    ("compare", "compare two languages, tools, or ideas"),
-    ("git", "get git commands for a task"),
-    ("commit", "write a git commit message"),
-    ("summarize", "summarize a block of text"),
-    ("case", "convert text between naming cases"),
-    ("slug", "make a URL slug from text"),
-    ("reverse", "reverse text"),
-    ("count", "count characters, words, and lines"),
-    ("lorem", "generate lorem ipsum placeholder text"),
-    ("json", "pretty-print and validate JSON"),
-    ("base64", "encode or decode base64"),
-    ("urlencode", "URL-encode or decode text"),
-    ("hash", "hash text (md5, sha1, sha256)"),
-    ("color", "convert colors (hex, rgb, hsl)"),
-    ("uuid", "generate a random UUID"),
-    ("password", "generate a strong password"),
-    ("timestamp", "unix timestamp tools"),
-    ("base", "convert number bases (bin/hex/dec)"),
-    ("sort", "sort lines alphabetically"),
-    ("dedupe", "remove duplicate lines"),
-    ("trim", "collapse and trim whitespace"),
-    ("rot13", "ROT13 encode/decode text"),
-    ("morse", "text to/from Morse code"),
-    ("charcode", "char to/from code point"),
-    ("http", "explain an HTTP status code"),
-    ("random", "random number in a range"),
-    ("pick", "pick a random option"),
-    ("coin", "flip a coin"),
-    ("image", "generate an image from a prompt"),
-    ("edit", "edit an image with an instruction"),
-    ("qr", "generate a QR code image"),
-    ("shorten", "shorten a URL"),
-    ("define", "define a word"),
-    ("convert", "convert image formats (jpg, png, webp...)"),
-    ("topdf", "turn text into a PDF file"),
-    ("pdf", "save this conversation as a PDF"),
-    ("roll", "roll the dice"),
-    ("roast", "get roasted"),
-    ("remember", "save a note"),
-    ("recall", "list your notes"),
-    ("forget", "clear your notes"),
-    ("mermaid", "generate a Mermaid diagram"),
-    ("uml", "describe a UML class diagram"),
-    ("flowchart", "turn a process into a flowchart"),
-    ("benchmark", "write a micro-benchmark for code"),
-    ("graphql", "design a GraphQL schema"),
-    ("openapi", "generate an OpenAPI (Swagger) spec"),
-    ("k8s", "generate a Kubernetes manifest"),
-    ("terraform", "generate Terraform config"),
-    ("nginx", "generate an nginx config"),
-    ("orm", "write ORM model code"),
-    ("auth", "outline authentication for a stack"),
-    ("jwt", "generate JWT auth code"),
-    ("validate", "write input-validation code"),
-    ("logging", "add logging to code"),
-    ("retry", "add retry logic to code"),
-    ("cache", "add caching to code"),
-    ("pagination", "implement pagination"),
-    ("migration", "write a database migration"),
-    ("mock", "generate test mocks/stubs"),
-    ("fixture", "generate test fixtures"),
-    ("decorator", "write a decorator/wrapper"),
-    ("async", "convert code to async"),
-    ("memoize", "add memoization to a function"),
-    ("solid", "refactor toward SOLID"),
-    ("dry", "remove duplicate code (DRY)"),
-    ("pr", "write a pull request description"),
-    ("cli", "build a command-line parser"),
-    ("middleware", "write middleware"),
-    ("webhook", "write a webhook handler"),
-    ("semver", "suggest the next semantic version"),
-]
-
-
-def command_menu():
-    """Full (command, description) list. This is the *complete* list used by
-    /help. /model, /models, and /sha are always available (they introspect
-    and switch the active model / report the running version, regardless of
-    HF config), so they are appended here rather than living in COMMANDS.
-    Telegram's set_my_commands "/" autocomplete accepts at most 100 commands,
-    so register_commands() (bot.clients) caps it there — /help still lists
-    everything (send_reply splits it across messages if needed)."""
-    cmds = list(COMMANDS)
-    cmds += [
+# Single source of truth for the bot's commands, grouped into categories.
+# COMMAND_CATEGORIES drives three things: the per-category /help messages,
+# the flat COMMANDS list below, and (via command_menu -> register_commands
+# in bot.clients) the Telegram "/" autocomplete menu. Add a new command to
+# the right category here when you add its handler, or it won't show up.
+COMMAND_CATEGORIES = [
+    ("🤖 Bot & session", [
+        ("start", "welcome message"),
+        ("help", "show this message"),
+        ("reset", "clear conversation history"),
+        ("about", "about this bot"),
         ("model", "show or switch the AI model"),
         ("models", "list the available AI models"),
         ("sha", "show the running version (commit SHA)"),
-    ]
-    return cmds
+    ]),
+    ("🎉 Fun & random", [
+        ("joke", "tell a programming joke"),
+        ("quote", "tell a coding quote"),
+        ("fact", "tell a coding fact"),
+        ("compliment", "give a compliment"),
+        ("motivate", "get a motivational boost"),
+        ("roast", "get roasted"),
+        ("roll", "roll the dice"),
+        ("coin", "flip a coin"),
+        ("random", "random number in a range"),
+        ("pick", "pick a random option"),
+    ]),
+    ("📚 Learn & explain", [
+        ("explain", "explain a coding topic"),
+        ("eli5", "explain a topic super simply"),
+        ("analogy", "explain a concept by analogy"),
+        ("cheatsheet", "quick reference for a topic"),
+        ("roadmap", "learning roadmap for a skill"),
+        ("challenge", "get a coding challenge"),
+        ("quiz", "take a quick quiz on a topic"),
+        ("interview", "get an interview question"),
+        ("compare", "compare two languages, tools, or ideas"),
+        ("http", "explain an HTTP status code"),
+    ]),
+    ("✍️ Write code", [
+        ("snippet", "generate a code snippet"),
+        ("pseudocode", "write pseudocode for a task"),
+        ("algo", "suggest an algorithm for a problem"),
+        ("scaffold", "starter project scaffold"),
+        ("cli", "build a command-line parser"),
+        ("decorator", "write a decorator/wrapper"),
+        ("middleware", "write middleware"),
+        ("webhook", "write a webhook handler"),
+        ("orm", "write ORM model code"),
+        ("auth", "outline authentication for a stack"),
+        ("jwt", "generate JWT auth code"),
+        ("validate", "write input-validation code"),
+        ("logging", "add logging to code"),
+        ("retry", "add retry logic to code"),
+        ("cache", "add caching to code"),
+        ("pagination", "implement pagination"),
+        ("migration", "write a database migration"),
+        ("async", "convert code to async"),
+        ("memoize", "add memoization to a function"),
+        ("mock", "generate test mocks/stubs"),
+        ("fixture", "generate test fixtures"),
+    ]),
+    ("🔧 Understand & improve code", [
+        ("explaincode", "explain what a piece of code does"),
+        ("translate", "translate code to another language"),
+        ("debug", "find the bug in your code"),
+        ("error", "explain and fix an error message"),
+        ("review", "get a short code review"),
+        ("lint", "check code for style/lint issues"),
+        ("optimize", "optimize code for speed and clarity"),
+        ("refactor", "restructure code for readability"),
+        ("oneliner", "condense code into a one-liner"),
+        ("types", "add type hints to code"),
+        ("document", "add docstrings and comments to code"),
+        ("test", "generate unit tests for your code"),
+        ("edgecases", "list edge cases to handle"),
+        ("complexity", "analyze time & space complexity"),
+        ("security", "check code for security issues"),
+        ("name", "suggest names for variables/functions"),
+        ("benchmark", "write a micro-benchmark for code"),
+        ("solid", "refactor toward SOLID"),
+        ("dry", "remove duplicate code (DRY)"),
+    ]),
+    ("🗄️ APIs, data & queries", [
+        ("api", "design a REST API"),
+        ("schema", "design a database schema"),
+        ("sql", "write a SQL query from a description"),
+        ("sqlformat", "format a SQL query"),
+        ("graphql", "design a GraphQL schema"),
+        ("openapi", "generate an OpenAPI (Swagger) spec"),
+        ("mockdata", "generate mock JSON data"),
+        ("regex", "build or explain a regular expression"),
+        ("regexplain", "explain a regular expression"),
+    ]),
+    ("⚙️ DevOps, git & config", [
+        ("bash", "write a bash command or script"),
+        ("curl", "build a curl command for an API"),
+        ("cron", "build and explain a cron expression"),
+        ("dockerfile", "generate a Dockerfile for a stack"),
+        ("gitignore", "generate a .gitignore for a stack"),
+        ("ci", "generate a GitHub Actions workflow"),
+        ("makefile", "generate a Makefile"),
+        ("compose", "generate a docker-compose.yml"),
+        ("dotenv", "generate a sample .env"),
+        ("k8s", "generate a Kubernetes manifest"),
+        ("terraform", "generate Terraform config"),
+        ("nginx", "generate an nginx config"),
+        ("git", "get git commands for a task"),
+        ("commit", "write a git commit message"),
+        ("pr", "write a pull request description"),
+        ("semver", "suggest the next semantic version"),
+        ("changelog", "write a changelog entry"),
+        ("readme", "generate a README"),
+    ]),
+    ("🏗️ Design & architecture", [
+        ("design", "high-level system design"),
+        ("pattern", "suggest a design pattern"),
+        ("stack", "recommend a tech stack"),
+        ("userstory", "write a user story"),
+        ("mermaid", "generate a Mermaid diagram"),
+        ("uml", "describe a UML class diagram"),
+        ("flowchart", "turn a process into a flowchart"),
+    ]),
+    ("🔤 Text & converters", [
+        ("summarize", "summarize a block of text"),
+        ("case", "convert text between naming cases"),
+        ("slug", "make a URL slug from text"),
+        ("reverse", "reverse text"),
+        ("count", "count characters, words, and lines"),
+        ("lorem", "generate lorem ipsum placeholder text"),
+        ("json", "pretty-print and validate JSON"),
+        ("base64", "encode or decode base64"),
+        ("urlencode", "URL-encode or decode text"),
+        ("hash", "hash text (md5, sha1, sha256)"),
+        ("color", "convert colors (hex, rgb, hsl)"),
+        ("uuid", "generate a random UUID"),
+        ("password", "generate a strong password"),
+        ("timestamp", "unix timestamp tools"),
+        ("base", "convert number bases (bin/hex/dec)"),
+        ("sort", "sort lines alphabetically"),
+        ("dedupe", "remove duplicate lines"),
+        ("trim", "collapse and trim whitespace"),
+        ("rot13", "ROT13 encode/decode text"),
+        ("morse", "text to/from Morse code"),
+        ("charcode", "char to/from code point"),
+    ]),
+    ("🖼️ Media & files", [
+        ("image", "generate an image from a prompt"),
+        ("edit", "edit an image with an instruction"),
+        ("qr", "generate a QR code image"),
+        ("shorten", "shorten a URL"),
+        ("define", "define a word"),
+        ("convert", "convert image formats (jpg, png, webp...)"),
+        ("topdf", "turn text into a PDF file"),
+        ("pdf", "save this conversation as a PDF"),
+    ]),
+    ("📝 Notes", [
+        ("remember", "save a note"),
+        ("recall", "list your notes"),
+        ("forget", "clear your notes"),
+    ]),
+]
+
+# Flat (command, description) list derived from the categories — the single
+# source used by the Telegram "/" autocomplete menu and command_menu().
+COMMANDS = [cmd for _title, cmds in COMMAND_CATEGORIES for cmd in cmds]
+
+
+def command_menu():
+    """Full flat (command, description) list, derived from COMMAND_CATEGORIES.
+    Used by register_commands() (bot.clients) for the "/" autocomplete menu and
+    by /help. /model, /models, and /sha live in the "Bot & session" category
+    because they are always available (they introspect / switch the active
+    model and report the running version, regardless of HF config). Telegram's
+    set_my_commands accepts at most 100 commands, so register_commands() caps it
+    there — /help still lists everything, grouped per category."""
+    return list(COMMANDS)
 
 
 # Small helper so new handlers can safely read the text after the command
@@ -2866,10 +2894,11 @@ def cmd_forget(message):
 
 @bot.message_handler(commands=["help"], func=is_allowed)
 def cmd_help(message):
-    lines = [f"/{name} — {desc}" for name, desc in command_menu()]
-    # send_reply splits across messages so the full list (now >100
-    # commands) never trips Telegram's 4096-char per-message limit.
-    send_reply(message, "\n".join(lines))
+    # One message per category so each fits well under Telegram's 4096-char
+    # limit and the list is easy to scan. send_reply handles any splitting.
+    for title, cmds in COMMAND_CATEGORIES:
+        body = "\n".join(f"/{name} — {desc}" for name, desc in cmds)
+        send_reply(message, f"*{title}*\n{body}")
 
 
 @bot.message_handler(commands=["reset"], func=is_allowed)

@@ -787,3 +787,32 @@ def test_edit_image_raises_when_no_backend_configured():
     ):
         with pytest.raises(RuntimeError):
             bot.handlers._edit_image("p", b"img")
+
+
+# --- /help (one message per category) --------------------------------------
+
+
+def test_cmd_help_sends_one_message_per_category():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.send_reply") as mock_reply,
+        patch("bot.handlers.bot"),
+    ):
+        from bot.handlers import cmd_help, COMMAND_CATEGORIES
+
+        cmd_help(make_message(text="/help"))
+        # exactly one message per category, each led by the category title
+        assert mock_reply.call_count == len(COMMAND_CATEGORIES)
+        for call, (title, _cmds) in zip(mock_reply.call_args_list, COMMAND_CATEGORIES):
+            text = call[0][1]
+            assert title in text
+
+
+def test_command_categories_have_no_duplicate_commands():
+    import bot.handlers
+
+    names = [name for _title, cmds in bot.handlers.COMMAND_CATEGORIES for name, _ in cmds]
+    assert len(names) == len(set(names)), "a command is listed in two categories"
+    # the flat COMMANDS list is exactly the categories flattened
+    assert [n for n, _ in bot.handlers.COMMANDS] == names
