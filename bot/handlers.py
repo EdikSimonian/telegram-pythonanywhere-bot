@@ -27,6 +27,7 @@ from bot.config import (
     HF_EDIT_TIMEOUT,
     HF_SPACE_ID,
     HF_TOKEN,
+    HF_TOKENS,
     HF_VIDEO_DURATION,
     HF_VIDEO_GUIDANCE,
     HF_VIDEO_HEIGHT,
@@ -2589,10 +2590,26 @@ def _do_edit(message, prompt, file_id=None):
 # still delivered out-of-band via send_video. There is no keyless fallback, so
 # /video is unavailable when HF_VIDEO_SPACE is blank.
 
+def _hf_video_tokens():
+    """Ordered list of HF tokens to try for /video: the primary HF_TOKEN first,
+    then any extras from HF_TOKENS (deduped). Empty list -> [None] so the Space
+    is still called anonymously when no token is configured."""
+    tokens = [HF_TOKEN] if HF_TOKEN else []
+    for t in HF_TOKENS:
+        if t and t not in tokens:
+            tokens.append(t)
+    return tokens or [None]
+
+
 def _generate_video_hf(prompt, image_bytes=None):
     """Generate a short video via the HF LTX-Video Space. With image_bytes it
     does image-to-video (/image_to_video); otherwise text-to-video
-    (/text_to_video). Returns the raw video bytes (an mp4)."""
+    (/text_to_video). Returns the raw video bytes (an mp4).
+
+    Rotates through _hf_video_tokens(): if a token's daily free ZeroGPU quota
+    is exhausted, it retries with the next token so multiple free accounts add
+    up to a larger daily budget. Any non-quota error fails immediately (no
+    point burning the other tokens on a real fault)."""
     import tempfile
     from gradio_client import Client, handle_file
 
@@ -2602,11 +2619,6 @@ def _generate_video_hf(prompt, image_bytes=None):
             tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             tmp.write(image_bytes)
             tmp.close()
-        client = Client(
-            HF_VIDEO_SPACE,
-            token=(HF_TOKEN or None),
-            httpx_kwargs={"timeout": HF_VIDEO_TIMEOUT},
-        )
         # Both endpoints share this ordered signature (see the Space's app.py).
         # Pass positionally so we don't depend on the gradio parameter *names*,
         # which vary by gradio version.
@@ -2626,7 +2638,24 @@ def _generate_video_hf(prompt, image_bytes=None):
             HF_VIDEO_IMPROVE,  # improve_texture_flag (2-pass; off = ~half the GPU quota)
         ]
         api_name = "/image_to_video" if tmp else "/text_to_video"
-        result = client.predict(*args, api_name=api_name)
+        tokens = _hf_video_tokens()
+        result = None
+        for i, token in enumerate(tokens):
+            try:
+                client = Client(
+                    HF_VIDEO_SPACE,
+                    token=(token or None),
+                    httpx_kwargs={"timeout": HF_VIDEO_TIMEOUT},
+                )
+                result = client.predict(*args, api_name=api_name)
+                break
+            except Exception as e:
+                # Roll over to the next token only on a quota error, and only
+                # if there is a next token; otherwise surface the failure.
+                if _is_zerogpu_quota_error(e) and i < len(tokens) - 1:
+                    print(f"/video: HF token #{i + 1} out of ZeroGPU quota, trying next")
+                    continue
+                raise
     finally:
         if tmp is not None:
             try:

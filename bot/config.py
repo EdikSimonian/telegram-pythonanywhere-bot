@@ -95,6 +95,16 @@ ALT_CEREBRAS_MODELS = [
 # Hugging Face provider (optional) — when set, users can switch via /model
 HF_SPACE_ID = os.environ.get("HF_SPACE_ID", "").strip()
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()  # optional, for private spaces
+# Extra HF tokens for /video quota rotation (comma-separated). When the
+# current token's daily free ZeroGPU quota is exhausted, /video rolls over to
+# the next one, giving roughly N× the free daily video budget. The primary
+# HF_TOKEN is tried first, then these in order. NOTE: creating extra HF
+# accounts solely to exceed the free quota may violate Hugging Face's terms —
+# populate this at your own discretion (it's also useful if you legitimately
+# hold more than one account/org token).
+HF_TOKENS = [
+    t.strip() for t in os.environ.get("HF_TOKENS", "").split(",") if t.strip()
+]
 DEFAULT_PROVIDER = "main"
 
 # Image generation for /image. When TOGETHER_API_KEY is set, /image uses

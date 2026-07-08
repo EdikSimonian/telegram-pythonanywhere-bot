@@ -939,3 +939,80 @@ def test_is_zerogpu_quota_error_detects_quota():
     )
     assert bot.handlers._is_zerogpu_quota_error(Exception("GPU quota exceeded"))
     assert not bot.handlers._is_zerogpu_quota_error(RuntimeError("connection reset"))
+
+
+def test_hf_video_tokens_orders_and_dedupes():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.HF_TOKEN", "primary"),
+        patch("bot.handlers.HF_TOKENS", ["primary", "second", "third"]),
+    ):
+        # primary first, then extras, with the duplicate primary dropped
+        assert bot.handlers._hf_video_tokens() == ["primary", "second", "third"]
+
+
+def test_hf_video_tokens_empty_falls_back_to_anonymous():
+    import bot.handlers
+
+    with (
+        patch("bot.handlers.HF_TOKEN", ""),
+        patch("bot.handlers.HF_TOKENS", []),
+    ):
+        assert bot.handlers._hf_video_tokens() == [None]
+
+
+def test_generate_video_rotates_to_next_token_on_quota():
+    """When the first token's ZeroGPU quota is spent, /video rolls over to the
+    next token and succeeds — the point of a second free HF token."""
+    import bot.handlers
+
+    used = []
+
+    class FakeClient:
+        def __init__(self, space, token=None, httpx_kwargs=None):
+            self.token = token
+
+        def predict(self, *args, api_name=None):
+            used.append(self.token)
+            if self.token == "tok_a":
+                raise RuntimeError("You have exceeded your free ZeroGPU quota")
+            return ("http://host/video.mp4", 7)
+
+    with (
+        patch("bot.handlers.HF_TOKEN", "tok_a"),
+        patch("bot.handlers.HF_TOKENS", ["tok_b"]),
+        patch("bot.handlers.HF_VIDEO_SPACE", "space/x"),
+        patch("bot.handlers._http_get_bytes", return_value=b"v" * 2000),
+        patch("gradio_client.Client", FakeClient),
+        patch("gradio_client.handle_file", lambda p: p),
+    ):
+        data = bot.handlers._generate_video_hf("a cat")
+        assert data == b"v" * 2000
+        assert used == ["tok_a", "tok_b"]  # tried primary, then rolled over
+
+
+def test_generate_video_non_quota_error_does_not_rotate():
+    """A non-quota failure must fail fast, not burn the other tokens."""
+    import bot.handlers
+    import pytest
+
+    used = []
+
+    class FakeClient:
+        def __init__(self, space, token=None, httpx_kwargs=None):
+            self.token = token
+
+        def predict(self, *args, api_name=None):
+            used.append(self.token)
+            raise RuntimeError("connection reset")
+
+    with (
+        patch("bot.handlers.HF_TOKEN", "tok_a"),
+        patch("bot.handlers.HF_TOKENS", ["tok_b"]),
+        patch("bot.handlers.HF_VIDEO_SPACE", "space/x"),
+        patch("gradio_client.Client", FakeClient),
+    ):
+        with pytest.raises(RuntimeError):
+            bot.handlers._generate_video_hf("a cat")
+        assert used == ["tok_a"]  # stopped at the first, no rollover
