@@ -176,7 +176,7 @@ COMMANDS = [
     ("coin", "flip a coin"),
     ("image", "generate an image from a prompt"),
     ("edit", "edit an image with an instruction"),
-    ("video", "generate a short video from a prompt or photo"),
+    ("video", "generate a short video from a prompt"),
     ("qr", "generate a QR code image"),
     ("shorten", "shorten a URL"),
     ("define", "define a word"),
@@ -2585,15 +2585,12 @@ def _do_edit(message, prompt, file_id=None):
 
 
 # --- Video generation for /video -------------------------------------------
-# /video makes a short clip from a text prompt (text-to-video) or animates a
-# photo (image-to-video), both via a free Hugging Face Space running LTX-Video.
-# Same gradio_client route as /edit: reached over hf.space (on PA's allowlist),
-# and any source image is uploaded straight to the Space (no public URL / no
-# bot-token leak). The default Space exposes two endpoints — /text_to_video and
-# /image_to_video — that share one ordered signature. Video is heavier than an
-# image edit, so on the shared free GPU a clip can take a minute or more; it's
-# still delivered out-of-band via send_video. There is no keyless fallback, so
-# /video is unavailable when HF_VIDEO_SPACE is blank.
+# /video makes a short clip from a text prompt (text-to-video) via a free
+# Hugging Face Space, reached over hf.space (on PA's allowlist) with the same
+# gradio_client route as /edit. Video is heavy, so on the shared free GPU a
+# clip can take a minute or more; it's still delivered out-of-band via
+# send_video. There is no keyless fallback, so /video is unavailable when
+# HF_VIDEO_SPACE is blank.
 
 def _hf_video_tokens():
     """Ordered list of HF tokens to try for /video: the primary HF_TOKEN first,
@@ -2606,13 +2603,12 @@ def _hf_video_tokens():
     return tokens or [None]
 
 
-def _build_video_call(prompt, image_handle):
-    """Return (args, api_name) for calling the configured HF_VIDEO_SPACE.
+def _build_video_call(prompt):
+    """Return (args, api_name) for a text-to-video call to HF_VIDEO_SPACE.
 
     Different video Spaces expose very different gradio signatures, so we
-    branch on the Space id. image_handle is a gradio handle_file(...) for
-    image-to-video, or None for text-to-video. Args are passed positionally so
-    we don't depend on gradio parameter *names* (which vary by version)."""
+    branch on the Space id. Args are passed positionally so we don't depend on
+    gradio parameter *names* (which vary by version)."""
     sid = HF_VIDEO_SPACE.lower()
     if "cogvideo" in sid:
         # zai-org/CogVideoX-5B-Space — a full (non-distilled) 5B model with
@@ -2622,7 +2618,7 @@ def _build_video_call(prompt, image_handle):
         # Space, so HF_VIDEO_GUIDANCE/DURATION/IMPROVE don't apply here.
         args = [
             prompt,  # prompt
-            image_handle,  # image_input (None = text-to-video)
+            None,  # image_input (text-to-video)
             None,  # video_input
             0.8,  # strength (image/video conditioning)
             -1,  # seed_param (-1 = random)
@@ -2630,16 +2626,15 @@ def _build_video_call(prompt, image_handle):
             False,  # enable_rife (frame interpolation; slower)
         ]
         return args, "/generate"
-    # Default: the Lightricks LTX-Video family (distilled or full). Two
-    # endpoints share one ordered signature (see the Space's app.py).
+    # Default: the Lightricks LTX-Video family (distilled or full).
     args = [
         prompt,  # prompt
         "worst quality, inconsistent motion, blurry, jittery, distorted",  # negative_prompt
-        image_handle,  # input_image_filepath
+        None,  # input_image_filepath
         None,  # input_video_filepath
         HF_VIDEO_HEIGHT,  # height_ui
         HF_VIDEO_WIDTH,  # width_ui
-        "image-to-video" if image_handle else "text-to-video",  # mode
+        "text-to-video",  # mode
         HF_VIDEO_DURATION,  # duration_ui
         9,  # ui_frames_to_use (video-to-video only)
         0,  # seed_ui
@@ -2647,55 +2642,39 @@ def _build_video_call(prompt, image_handle):
         HF_VIDEO_GUIDANCE,  # ui_guidance_scale
         HF_VIDEO_IMPROVE,  # improve_texture_flag (2-pass; off = ~half the GPU quota)
     ]
-    api_name = "/image_to_video" if image_handle else "/text_to_video"
-    return args, api_name
+    return args, "/text_to_video"
 
 
-def _generate_video_hf(prompt, image_bytes=None):
-    """Generate a short video via the configured HF video Space. With
-    image_bytes it does image-to-video; otherwise text-to-video. Returns the
-    raw video bytes (an mp4). The per-Space call is built by _build_video_call.
+def _generate_video_hf(prompt):
+    """Generate a short text-to-video clip via the configured HF video Space.
+    Returns the raw video bytes (an mp4). The per-Space call is built by
+    _build_video_call.
 
     Rotates through _hf_video_tokens(): if a token's daily free ZeroGPU quota
     is exhausted, it retries with the next token so multiple free accounts add
     up to a larger daily budget. Any non-quota error fails immediately (no
     point burning the other tokens on a real fault)."""
-    import tempfile
-    from gradio_client import Client, handle_file
+    from gradio_client import Client
 
-    tmp = None
-    try:
-        if image_bytes:
-            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-            tmp.write(image_bytes)
-            tmp.close()
-        args, api_name = _build_video_call(
-            prompt, handle_file(tmp.name) if tmp else None
-        )
-        tokens = _hf_video_tokens()
-        result = None
-        for i, token in enumerate(tokens):
-            try:
-                client = Client(
-                    HF_VIDEO_SPACE,
-                    token=(token or None),
-                    httpx_kwargs={"timeout": HF_VIDEO_TIMEOUT},
-                )
-                result = client.predict(*args, api_name=api_name)
-                break
-            except Exception as e:
-                # Roll over to the next token only on a quota error, and only
-                # if there is a next token; otherwise surface the failure.
-                if _is_zerogpu_quota_error(e) and i < len(tokens) - 1:
-                    print(f"/video: HF token #{i + 1} out of ZeroGPU quota, trying next")
-                    continue
-                raise
-    finally:
-        if tmp is not None:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
+    args, api_name = _build_video_call(prompt)
+    tokens = _hf_video_tokens()
+    result = None
+    for i, token in enumerate(tokens):
+        try:
+            client = Client(
+                HF_VIDEO_SPACE,
+                token=(token or None),
+                httpx_kwargs={"timeout": HF_VIDEO_TIMEOUT},
+            )
+            result = client.predict(*args, api_name=api_name)
+            break
+        except Exception as e:
+            # Roll over to the next token only on a quota error, and only if
+            # there is a next token; otherwise surface the failure.
+            if _is_zerogpu_quota_error(e) and i < len(tokens) - 1:
+                print(f"/video: HF token #{i + 1} out of ZeroGPU quota, trying next")
+                continue
+            raise
 
     # Returns (video_path, used_seed); the video is a local path (str) or a
     # {video|path|url} dict depending on the gradio version.
@@ -2723,34 +2702,26 @@ def _is_zerogpu_quota_error(exc):
     return "zerogpu" in msg or ("quota" in msg and "exceeded" in msg)
 
 
-def _generate_video(prompt, image_bytes=None):
+def _generate_video(prompt):
     """Dispatch /video to its only backend (a free HF Space). Raise a clear
     message when it isn't configured — there is no keyless video fallback."""
     if not HF_VIDEO_SPACE:
         raise RuntimeError(
             "video generation isn't configured on this bot — set HF_VIDEO_SPACE "
-            "to a Hugging Face text/image-to-video Space (default "
+            "to a Hugging Face text-to-video Space (default "
             "Lightricks/ltx-video-distilled)."
         )
-    return _generate_video_hf(prompt, image_bytes)
+    return _generate_video_hf(prompt)
 
 
 @bot.message_handler(commands=["video"], func=is_allowed)
 def cmd_video(message):
     prompt = _arg(message)
-    # Image-to-video: reply to a photo/image with "/video <optional motion>".
-    replied_file_id = _image_file_id(getattr(message, "reply_to_message", None))
-    if replied_file_id:
-        _do_video(message, prompt, replied_file_id)
-        return
     if not prompt:
         bot.send_message(
             message.chat.id,
-            "Usage — make a short video:\n"
-            "• Text → video: /video <prompt>\n"
-            "    e.g. /video a paper boat sailing down a rainy street\n"
-            "• Image → video: send a photo captioned /video <optional motion>,\n"
-            "    or reply to a photo with /video <optional motion>\n"
+            "Usage: /video <prompt>\n"
+            "Example: /video a paper boat sailing down a rainy street\n"
             "\n"
             "📊 What to expect (free tier):\n"
             f"• Clip length: about {int(HF_VIDEO_DURATION)} seconds\n"
@@ -2759,33 +2730,12 @@ def cmd_video(message):
             "Face's free GPU quota, which resets every day",
         )
         return
-    # A bare prompt is an unambiguous text-to-video request.
-    _do_video(message, prompt, None)
+    _do_video(message, prompt)
 
 
-@bot.message_handler(
-    content_types=["photo", "document"],
-    func=lambda m: _command_in_caption(m, "video"),
-)
-def cmd_video_caption(message):
-    parts = (message.caption or "").strip().split(maxsplit=1)
-    prompt = parts[1].strip() if len(parts) > 1 else ""
-    file_id = _image_file_id(message)
-    if not file_id:
-        bot.send_message(
-            message.chat.id,
-            "Send a photo or image file with the caption /video <optional motion>.",
-        )
-        return
-    _do_video(message, prompt, file_id)
-
-
-def _do_video(message, prompt, file_id=None):
+def _do_video(message, prompt):
     prompt = (prompt or "").strip()
-    if file_id is not None and not prompt:
-        # Image-to-video with no words: ask for gentle, generic motion.
-        prompt = "animate this image with subtle, natural motion"
-    if file_id is None and not prompt:
+    if not prompt:
         bot.send_message(
             message.chat.id, "Add a prompt — e.g. /video a cat surfing a wave."
         )
@@ -2795,13 +2745,9 @@ def _do_video(message, prompt, file_id=None):
     except Exception:
         pass
     try:
-        source = None
-        if file_id is not None:
-            info = bot.get_file(file_id)
-            source = bot.download_file(info.file_path)
         # Video on a free GPU can take a minute+; keep the indicator alive.
         with keep_typing(message.chat.id, action="upload_video"):
-            data = _generate_video(prompt, source)
+            data = _generate_video(prompt)
     except Exception as e:
         print(f"Error in _do_video: {e}")  # surface backend failures in the PA log
         if _is_zerogpu_quota_error(e):

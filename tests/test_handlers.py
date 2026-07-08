@@ -800,9 +800,8 @@ def test_cmd_video_no_prompt_shows_usage():
         assert "Usage" in mock_bot.send_message.call_args[0][1]
 
 
-def test_cmd_video_bare_prompt_does_text_to_video():
-    """A bare '/video <prompt>' is an unambiguous text-to-video request
-    (file_id None), no image needed."""
+def test_cmd_video_prompt_triggers_generation():
+    """'/video <prompt>' is a text-to-video request."""
     with (
         patch("bot.handlers._do_video") as mock_do,
         patch("bot.handlers.bot"),
@@ -811,82 +810,19 @@ def test_cmd_video_bare_prompt_does_text_to_video():
 
         cmd_video(make_message(text="/video a cat surfing a wave"))
         mock_do.assert_called_once_with(
-            mock_do.call_args[0][0], "a cat surfing a wave", None
+            mock_do.call_args[0][0], "a cat surfing a wave"
         )
 
 
-def test_cmd_video_reply_to_photo_animates_immediately():
-    """Replying to a photo with '/video <motion>' does image-to-video with the
-    replied photo's file_id."""
-    with (
-        patch("bot.handlers._do_video") as mock_do,
-        patch("bot.handlers.bot"),
-    ):
-        from bot.handlers import cmd_video
-
-        msg = make_message(text="/video make it wave")
-        msg.reply_to_message = _photo_message(file_id="src_fid")
-        cmd_video(msg)
-        mock_do.assert_called_once_with(msg, "make it wave", "src_fid")
-
-
-def test_command_in_caption_detects_video():
-    import bot.handlers
-
-    with patch("bot.handlers.is_allowed", return_value=True):
-        yes = MagicMock(caption="/video make it move")
-        atbot = MagicMock(caption="/video@testbot make it move")
-        no1 = MagicMock(caption="/edit make it blue")
-        no2 = MagicMock(caption="just a photo")
-        assert bot.handlers._command_in_caption(yes, "video") is True
-        assert bot.handlers._command_in_caption(atbot, "video") is True
-        assert bot.handlers._command_in_caption(no1, "video") is False
-        assert bot.handlers._command_in_caption(no2, "video") is False
-
-
-def test_cmd_video_caption_animates_photo_with_caption():
-    with (
-        patch("bot.handlers._do_video") as mock_do,
-        patch("bot.handlers.bot"),
-    ):
-        from bot.handlers import cmd_video_caption
-
-        msg = _photo_message(file_id="cap_fid")
-        msg.caption = "/video make it rain"
-        cmd_video_caption(msg)
-        mock_do.assert_called_once_with(msg, "make it rain", "cap_fid")
-
-
-def test_do_video_text_calls_backend_and_sends_video():
+def test_do_video_calls_backend_and_sends_video():
     with (
         patch("bot.handlers._generate_video", return_value=b"v" * 2000) as mock_gen,
         patch("bot.handlers.bot") as mock_bot,
     ):
         from bot.handlers import _do_video
 
-        _do_video(make_message(), "a paper boat", None)
-        # text-to-video: no source download, image bytes None
-        mock_bot.get_file.assert_not_called()
+        _do_video(make_message(), "a paper boat")
         assert mock_gen.call_args[0][0] == "a paper boat"
-        assert mock_gen.call_args[0][1] is None
-        assert mock_bot.send_video.called
-
-
-def test_do_video_image_downloads_source_and_defaults_prompt():
-    """Image-to-video with no words downloads the source and supplies a gentle
-    default motion prompt."""
-    with (
-        patch("bot.handlers._generate_video", return_value=b"v" * 2000) as mock_gen,
-        patch("bot.handlers.bot") as mock_bot,
-    ):
-        from bot.handlers import _do_video
-
-        mock_bot.get_file.return_value = MagicMock(file_path="path/src.jpg")
-        mock_bot.download_file.return_value = b"source-bytes"
-        _do_video(make_message(), "", file_id="fid")
-        mock_bot.download_file.assert_called_once_with("path/src.jpg")
-        assert mock_gen.call_args[0][1] == b"source-bytes"
-        assert mock_gen.call_args[0][0]  # a non-empty default prompt was used
         assert mock_bot.send_video.called
 
 
@@ -897,7 +833,7 @@ def test_do_video_reports_backend_error():
     ):
         from bot.handlers import _do_video
 
-        _do_video(make_message(), "a cat", None)
+        _do_video(make_message(), "a cat")
         assert "Couldn't generate" in mock_bot.send_message.call_args[0][1]
         assert "gpu busy" in mock_bot.send_message.call_args[0][1]
 
@@ -924,7 +860,7 @@ def test_do_video_zerogpu_quota_shows_friendly_message():
     ):
         from bot.handlers import _do_video
 
-        _do_video(make_message(), "a cat", None)
+        _do_video(make_message(), "a cat")
         sent = mock_bot.send_message.call_args[0][1]
         assert "quota" in sent.lower()
         assert "later" in sent.lower()
@@ -998,28 +934,23 @@ def test_build_video_call_cogvideo_profile():
     import bot.handlers
 
     with patch("bot.handlers.HF_VIDEO_SPACE", "zai-org/CogVideoX-5B-Space"):
-        # text-to-video: image handle is None
-        args, api = bot.handlers._build_video_call("a cat", None)
+        args, api = bot.handlers._build_video_call("a cat")
         assert api == "/generate"
         assert args[0] == "a cat"
-        assert args[1] is None  # image_input
+        assert args[1] is None  # image_input (text-to-video)
         assert len(args) == 7
-        # image-to-video: handle passed through as image_input
-        args2, _ = bot.handlers._build_video_call("a cat", "IMG_HANDLE")
-        assert args2[1] == "IMG_HANDLE"
 
 
 def test_build_video_call_ltx_profile():
-    """LTX Spaces use /text_to_video vs /image_to_video and a 13-arg signature."""
+    """LTX Spaces use /text_to_video and a 13-arg signature."""
     import bot.handlers
 
     with patch("bot.handlers.HF_VIDEO_SPACE", "Lightricks/ltx-video-distilled"):
-        args, api = bot.handlers._build_video_call("a cat", None)
+        args, api = bot.handlers._build_video_call("a cat")
         assert api == "/text_to_video"
         assert args[0] == "a cat"
+        assert args[6] == "text-to-video"  # mode
         assert len(args) == 13
-        _, api2 = bot.handlers._build_video_call("a cat", "IMG_HANDLE")
-        assert api2 == "/image_to_video"
 
 
 def test_generate_video_non_quota_error_does_not_rotate():
