@@ -2606,10 +2606,55 @@ def _hf_video_tokens():
     return tokens or [None]
 
 
+def _build_video_call(prompt, image_handle):
+    """Return (args, api_name) for calling the configured HF_VIDEO_SPACE.
+
+    Different video Spaces expose very different gradio signatures, so we
+    branch on the Space id. image_handle is a gradio handle_file(...) for
+    image-to-video, or None for text-to-video. Args are passed positionally so
+    we don't depend on gradio parameter *names* (which vary by version)."""
+    sid = HF_VIDEO_SPACE.lower()
+    if "cogvideo" in sid:
+        # zai-org/CogVideoX-5B-Space — a full (non-distilled) 5B model with
+        # much better prompt adherence than distilled LTX, at ~6s/clip.
+        # generate(prompt, image, video, strength, seed, enable_scale,
+        # enable_rife) -> (video_path, ...). Guidance/length are fixed in the
+        # Space, so HF_VIDEO_GUIDANCE/DURATION/IMPROVE don't apply here.
+        args = [
+            prompt,  # prompt
+            image_handle,  # image_input (None = text-to-video)
+            None,  # video_input
+            0.8,  # strength (image/video conditioning)
+            -1,  # seed_param (-1 = random)
+            False,  # enable_scale (super-resolution; slower)
+            False,  # enable_rife (frame interpolation; slower)
+        ]
+        return args, "/generate"
+    # Default: the Lightricks LTX-Video family (distilled or full). Two
+    # endpoints share one ordered signature (see the Space's app.py).
+    args = [
+        prompt,  # prompt
+        "worst quality, inconsistent motion, blurry, jittery, distorted",  # negative_prompt
+        image_handle,  # input_image_filepath
+        None,  # input_video_filepath
+        HF_VIDEO_HEIGHT,  # height_ui
+        HF_VIDEO_WIDTH,  # width_ui
+        "image-to-video" if image_handle else "text-to-video",  # mode
+        HF_VIDEO_DURATION,  # duration_ui
+        9,  # ui_frames_to_use (video-to-video only)
+        0,  # seed_ui
+        True,  # randomize_seed
+        HF_VIDEO_GUIDANCE,  # ui_guidance_scale
+        HF_VIDEO_IMPROVE,  # improve_texture_flag (2-pass; off = ~half the GPU quota)
+    ]
+    api_name = "/image_to_video" if image_handle else "/text_to_video"
+    return args, api_name
+
+
 def _generate_video_hf(prompt, image_bytes=None):
-    """Generate a short video via the HF LTX-Video Space. With image_bytes it
-    does image-to-video (/image_to_video); otherwise text-to-video
-    (/text_to_video). Returns the raw video bytes (an mp4).
+    """Generate a short video via the configured HF video Space. With
+    image_bytes it does image-to-video; otherwise text-to-video. Returns the
+    raw video bytes (an mp4). The per-Space call is built by _build_video_call.
 
     Rotates through _hf_video_tokens(): if a token's daily free ZeroGPU quota
     is exhausted, it retries with the next token so multiple free accounts add
@@ -2624,25 +2669,9 @@ def _generate_video_hf(prompt, image_bytes=None):
             tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             tmp.write(image_bytes)
             tmp.close()
-        # Both endpoints share this ordered signature (see the Space's app.py).
-        # Pass positionally so we don't depend on the gradio parameter *names*,
-        # which vary by gradio version.
-        args = [
-            prompt,  # prompt
-            "worst quality, inconsistent motion, blurry, jittery, distorted",  # negative_prompt
-            handle_file(tmp.name) if tmp else None,  # input_image_filepath
-            None,  # input_video_filepath
-            HF_VIDEO_HEIGHT,  # height_ui
-            HF_VIDEO_WIDTH,  # width_ui
-            "image-to-video" if tmp else "text-to-video",  # mode
-            HF_VIDEO_DURATION,  # duration_ui
-            9,  # ui_frames_to_use (video-to-video only)
-            0,  # seed_ui
-            True,  # randomize_seed
-            HF_VIDEO_GUIDANCE,  # ui_guidance_scale
-            HF_VIDEO_IMPROVE,  # improve_texture_flag (2-pass; off = ~half the GPU quota)
-        ]
-        api_name = "/image_to_video" if tmp else "/text_to_video"
+        args, api_name = _build_video_call(
+            prompt, handle_file(tmp.name) if tmp else None
+        )
         tokens = _hf_video_tokens()
         result = None
         for i, token in enumerate(tokens):

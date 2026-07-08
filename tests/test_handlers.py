@@ -992,6 +992,36 @@ def test_generate_video_rotates_to_next_token_on_quota():
         assert used == ["tok_a", "tok_b"]  # tried primary, then rolled over
 
 
+def test_build_video_call_cogvideo_profile():
+    """CogVideoX Spaces use /generate with a 7-arg signature (no negative
+    prompt / guidance / duration)."""
+    import bot.handlers
+
+    with patch("bot.handlers.HF_VIDEO_SPACE", "zai-org/CogVideoX-5B-Space"):
+        # text-to-video: image handle is None
+        args, api = bot.handlers._build_video_call("a cat", None)
+        assert api == "/generate"
+        assert args[0] == "a cat"
+        assert args[1] is None  # image_input
+        assert len(args) == 7
+        # image-to-video: handle passed through as image_input
+        args2, _ = bot.handlers._build_video_call("a cat", "IMG_HANDLE")
+        assert args2[1] == "IMG_HANDLE"
+
+
+def test_build_video_call_ltx_profile():
+    """LTX Spaces use /text_to_video vs /image_to_video and a 13-arg signature."""
+    import bot.handlers
+
+    with patch("bot.handlers.HF_VIDEO_SPACE", "Lightricks/ltx-video-distilled"):
+        args, api = bot.handlers._build_video_call("a cat", None)
+        assert api == "/text_to_video"
+        assert args[0] == "a cat"
+        assert len(args) == 13
+        _, api2 = bot.handlers._build_video_call("a cat", "IMG_HANDLE")
+        assert api2 == "/image_to_video"
+
+
 def test_generate_video_non_quota_error_does_not_rotate():
     """A non-quota failure must fail fast, not burn the other tokens."""
     import bot.handlers
