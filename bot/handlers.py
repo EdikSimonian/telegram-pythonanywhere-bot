@@ -170,7 +170,6 @@ COMMANDS = [
     ("edit", "edit an image with an instruction"),
     ("qr", "generate a QR code image"),
     ("shorten", "shorten a URL"),
-    ("weather", "current weather for a city"),
     ("define", "define a word"),
     ("convert", "convert image formats (jpg, png, webp...)"),
     ("topdf", "turn text into a PDF file"),
@@ -2567,7 +2566,7 @@ def _do_edit(message, prompt, file_id=None):
         bot.send_document(message.chat.id, buf, visible_file_name="edited.jpg")
 
 
-# --- More free/keyless helpers (QR, URL shortener, weather, dictionary) ------
+# --- More free/keyless helpers (QR, URL shortener, dictionary) ------
 
 def _http_get_text(url, timeout=30, retries=0):
     return _http_get_bytes(url, timeout=timeout, retries=retries).decode("utf-8", "replace")
@@ -2637,66 +2636,6 @@ def cmd_shorten(message):
         bot.send_message(message.chat.id, f"Couldn't shorten that URL. ({short[:100]})")
         return
     bot.send_message(message.chat.id, short)
-
-
-# WMO weather-interpretation codes → human text (open-meteo `weather_code`).
-_WMO_WEATHER = {
-    0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-    45: "Fog", 48: "Depositing rime fog", 51: "Light drizzle", 53: "Drizzle",
-    55: "Dense drizzle", 56: "Freezing drizzle", 57: "Dense freezing drizzle",
-    61: "Slight rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain",
-    67: "Heavy freezing rain", 71: "Slight snow", 73: "Snow", 75: "Heavy snow",
-    77: "Snow grains", 80: "Slight rain showers", 81: "Rain showers",
-    82: "Violent rain showers", 85: "Snow showers", 86: "Heavy snow showers",
-    95: "Thunderstorm", 96: "Thunderstorm with hail", 99: "Thunderstorm with heavy hail",
-}
-
-
-@bot.message_handler(commands=["weather"], func=is_allowed)
-def cmd_weather(message):
-    city = _arg(message)
-    if not city:
-        bot.send_message(message.chat.id, "Usage: /weather <city>  (e.g. /weather Yerevan)")
-        return
-    # open-meteo is keyless and on PythonAnywhere's outbound allowlist
-    # (geocoding-api / api.open-meteo.com). Geocode the city, then fetch the
-    # current conditions for its coordinates.
-    try:
-        geo = json.loads(_http_get_text(
-            "https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name="
-            + quote(city, safe=""),
-            timeout=20,
-            retries=3,
-        ))
-        results = geo.get("results") or []
-        if not results:
-            bot.send_message(message.chat.id, f"Couldn't find a place called '{city}'.")
-            return
-        loc = results[0]
-        lat, lon = loc["latitude"], loc["longitude"]
-        forecast = json.loads(_http_get_text(
-            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-            "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
-            timeout=20,
-            retries=3,
-        ))
-    except Exception as e:
-        msg = "the weather service is busy right now — try again in a moment" \
-            if "429" in str(e) else str(e)
-        bot.send_message(message.chat.id, f"Couldn't get the weather: {msg}")
-        return
-    cur = forecast.get("current") or {}
-    if "temperature_2m" not in cur:
-        bot.send_message(message.chat.id, f"Couldn't get the weather for '{city}'.")
-        return
-    place = ", ".join(p for p in (loc.get("name"), loc.get("country")) if p)
-    desc = _WMO_WEATHER.get(cur.get("weather_code"), "")
-    lines = [f"Weather in {place or city}:"]
-    if desc:
-        lines.append(desc)
-    lines.append(f"Temp: {cur['temperature_2m']}°C (feels {cur.get('apparent_temperature', '?')}°C)")
-    lines.append(f"Wind: {cur.get('wind_speed_10m', '?')} km/h")
-    bot.send_message(message.chat.id, "\n".join(lines))
 
 
 @bot.message_handler(commands=["define"], func=is_allowed)
