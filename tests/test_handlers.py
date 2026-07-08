@@ -909,3 +909,33 @@ def test_generate_video_raises_when_not_configured():
     with patch("bot.handlers.HF_VIDEO_SPACE", ""):
         with pytest.raises(RuntimeError):
             bot.handlers._generate_video("a cat")
+
+
+def test_do_video_zerogpu_quota_shows_friendly_message():
+    """A ZeroGPU daily-quota error is expected on the free tier, so /video
+    should explain it resets — not dump the raw HF upsell URL."""
+    quota_err = RuntimeError(
+        "You have exceeded your free ZeroGPU quota (120s requested vs. -60s "
+        "left). Subscribe to Hugging Face PRO ..."
+    )
+    with (
+        patch("bot.handlers._generate_video", side_effect=quota_err),
+        patch("bot.handlers.bot") as mock_bot,
+    ):
+        from bot.handlers import _do_video
+
+        _do_video(make_message(), "a cat", None)
+        sent = mock_bot.send_message.call_args[0][1]
+        assert "quota" in sent.lower()
+        assert "later" in sent.lower()
+        assert "http" not in sent  # no raw upsell URL leaked to the user
+
+
+def test_is_zerogpu_quota_error_detects_quota():
+    import bot.handlers
+
+    assert bot.handlers._is_zerogpu_quota_error(
+        RuntimeError("exceeded your free ZeroGPU quota")
+    )
+    assert bot.handlers._is_zerogpu_quota_error(Exception("GPU quota exceeded"))
+    assert not bot.handlers._is_zerogpu_quota_error(RuntimeError("connection reset"))

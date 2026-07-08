@@ -30,6 +30,7 @@ from bot.config import (
     HF_VIDEO_DURATION,
     HF_VIDEO_GUIDANCE,
     HF_VIDEO_HEIGHT,
+    HF_VIDEO_IMPROVE,
     HF_VIDEO_SPACE,
     HF_VIDEO_TIMEOUT,
     HF_VIDEO_WIDTH,
@@ -2622,7 +2623,7 @@ def _generate_video_hf(prompt, image_bytes=None):
             0,  # seed_ui
             True,  # randomize_seed
             HF_VIDEO_GUIDANCE,  # ui_guidance_scale
-            True,  # improve_texture_flag
+            HF_VIDEO_IMPROVE,  # improve_texture_flag (2-pass; off = ~half the GPU quota)
         ]
         api_name = "/image_to_video" if tmp else "/text_to_video"
         result = client.predict(*args, api_name=api_name)
@@ -2648,6 +2649,15 @@ def _generate_video_hf(prompt, image_bytes=None):
     if not data or len(data) < 1000:  # too small to be a real video
         raise RuntimeError("the video service returned no video")
     return data
+
+
+def _is_zerogpu_quota_error(exc):
+    """True when a gradio_client call failed because the Space's free ZeroGPU
+    daily quota is exhausted — a transient, expected limit on the free tier,
+    not a bug — so /video can say "try again later" instead of dumping the raw
+    upsell URL at the user."""
+    msg = str(exc).lower()
+    return "zerogpu" in msg or ("quota" in msg and "exceeded" in msg)
 
 
 def _generate_video(prompt, image_bytes=None):
@@ -2726,7 +2736,15 @@ def _do_video(message, prompt, file_id=None):
             data = _generate_video(prompt, source)
     except Exception as e:
         print(f"Error in _do_video: {e}")  # surface backend failures in the PA log
-        bot.send_message(message.chat.id, f"Couldn't generate that video: {e}")
+        if _is_zerogpu_quota_error(e):
+            bot.send_message(
+                message.chat.id,
+                "🎬 Out of free video quota for now. Video runs on Hugging "
+                "Face's free shared GPU, which has a small daily limit — it "
+                "resets in a few hours, so try again later.",
+            )
+        else:
+            bot.send_message(message.chat.id, f"Couldn't generate that video: {e}")
         return
     buf = io.BytesIO(data)
     buf.name = "video.mp4"

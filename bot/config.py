@@ -177,6 +177,16 @@ HF_VIDEO_GUIDANCE = float(os.environ.get("HF_VIDEO_GUIDANCE", "3.0"))
 # dimensions that are multiples of 32.
 HF_VIDEO_HEIGHT = int(os.environ.get("HF_VIDEO_HEIGHT", "512"))
 HF_VIDEO_WIDTH = int(os.environ.get("HF_VIDEO_WIDTH", "704"))
+# Two-pass "improve texture" render. True ~doubles the GPU seconds per clip
+# (and the free daily ZeroGPU quota it burns) for a modest quality bump.
+# Default False: the fast single-pass path — quicker clips and roughly twice
+# as many per day on the free quota. Set to 1/true for higher quality.
+HF_VIDEO_IMPROVE = os.environ.get("HF_VIDEO_IMPROVE", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 
 # Storage — optional. When SQLITE_PATH is unset the bot runs in
 # stateless mode: history / rate limiting / preferences / dedupe all
